@@ -76,6 +76,7 @@ export default function App() {
   }, [activeApp, apps]);
 
   const selectedContainerName = activeApp?.container ?? "Standalone";
+  const activeContainerLabel = activeApp?.container ?? "Standalone";
 
   const webviewUserAgent = useMemo(() => {
     // Some sites reject Electron-specific UAs even when Chromium is modern.
@@ -421,6 +422,19 @@ export default function App() {
     event.target.value = "";
   };
 
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+
+      await document.documentElement.requestFullscreen();
+    } catch {
+      // Ignore fullscreen rejections from browser policies.
+    }
+  };
+
   const groupedApps = useMemo(() => {
     return {
       Work: workspaceApps.filter((item) => item.section === "Work"),
@@ -507,12 +521,25 @@ export default function App() {
           <button type="button" className="toolbar-button" onClick={() => webviewRef.current?.reload()}>
             Reload
           </button>
+          <button type="button" className="toolbar-button" onClick={() => void toggleFullscreen()}>
+            Fullscreen
+          </button>
+          <div className="container-indicator" title={`Current container: ${activeContainerLabel}`}>
+            <span className="container-indicator-label">Container</span>
+            <span
+              className={`container-indicator-value ${
+                activeContainerLabel === "Standalone" ? "standalone" : "shared"
+              }`}
+            >
+              {activeContainerLabel}
+            </span>
+          </div>
           <span className="toolbar-state">
-            {isPageLoading ? "Loading..." : lastLoadError ? `Error: ${lastLoadError}` : activePartition}
+            {isPageLoading ? "Loading..." : lastLoadError ? `Error: ${lastLoadError}` : "Ready"}
           </span>
           <button
             type="button"
-            className="settings-icon-button"
+            className="toolbar-icon-button"
             aria-label="Open settings"
             onClick={() => setSettingsOpen((prev) => !prev)}
           >

@@ -74,6 +74,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .hidden-file-input {
@@ -363,7 +364,10 @@ h1 {
   background: #ffffff;
   color: #111827;
   padding: 6px 10px;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  letter-spacing: 0.01em;
   cursor: pointer;
 }
 
@@ -373,15 +377,16 @@ h1 {
 }
 
 .toolbar-state {
+  margin-left: 2px;
   font-size: 0.73rem;
   color: #6b7280;
-  max-width: 180px;
+  max-width: 90px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.settings-icon-button {
+.toolbar-icon-button {
   border: 1px solid #d1d5db;
   border-radius: 8px;
   background: #111827;
@@ -392,6 +397,53 @@ h1 {
   font-size: 0.95rem;
   line-height: 1;
   cursor: pointer;
+}
+
+.container-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #ffffff;
+  padding: 4px 8px;
+  max-width: 230px;
+}
+
+.container-indicator-label {
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  font-weight: 700;
+}
+
+.container-indicator-value {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.container-indicator-value.standalone::before,
+.container-indicator-value.shared::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.container-indicator-value.standalone::before {
+  background: #9ca3af;
+}
+
+.container-indicator-value.shared::before {
+  background: #10b981;
 }
 
 .webview-host {
