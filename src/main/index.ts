@@ -1,0 +1,104 @@
+import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { IPC_CHANNELS, type PingResponse } from "../shared/ipc";
+import {
+  DEFAULT_APP_STATE,
+  parsePersistedAppState,
+  type PersistedAppState
+} from "../shared/state";
+
+const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
+let appState: PersistedAppState = DEFAULT_APP_STATE;
+
+function getStateFilePath(): string {
+  return join(app.getPath("userData"), "state.json");
+}
+
+async function readStateFromDisk(): Promise<PersistedAppState> {
+  try {
+    const raw = await readFile(getStateFilePath(), "utf-8");
+    const parsed = JSON.parse(raw) as unknown;
+    return parsePersistedAppState(parsed);
+  } catch {
+    return DEFAULT_APP_STATE;
+  }
+}
+
+async function writeStateToDisk(nextState: PersistedAppState): Promise<void> {
+  const filePath = getStateFilePath();
+  await mkdir(dirname(filePath), { recursive: true });
+  await writeFile(filePath, JSON.stringify(nextState, null, 2), "utf-8");
+}
+
+function createWindow(): BrowserWindow {
+  const win = new BrowserWindow({
+    width: 1320,
+    height: 860,
+    minWidth: 1024,
+    minHeight: 680,
+    backgroundColor: "#111827",
+    titleBarStyle: "hiddenInset",
+    webPreferences: {
+      preload: join(__dirname, "../preload/index.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      webviewTag: true
+    }
+  });
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
+
+  if (isDev) {
+    void win.loadURL(process.env.VITE_DEV_SERVER_URL as string);
+    win.webContents.openDevTools({ mode: "detach" });
+  } else {
+    void win.loadFile(join(app.getAppPath(), "dist/index.html"));
+  }
+
+  return win;
+}
+
+app.whenReady().then(() => {
+  void readStateFromDisk().then((loaded) => {
+    appState = loaded;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ping, (_event, message: string): PingResponse => {
+    return {
+      ok: true,
+      message: `Main received: ${message}`,
+      timestamp: new Date().toISOString()
+    };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.getState, async () => {
+    appState = await readStateFromDisk();
+    return appState;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.saveState, async (_event, nextState: PersistedAppState) => {
+    const parsed = parsePersistedAppState(nextState);
+    appState = parsed;
+    await writeStateToDisk(parsed);
+    return appState;
+  });
+
+  createWindow();
+
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+});
+
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
+});

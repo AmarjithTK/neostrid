@@ -1,0 +1,68 @@
+{
+  "name": "biscuit-clone",
+  "version": "0.1.0",
+  "description": "Container-first desktop app browser built with Electron and React.",
+  "main": "dist-electron/main/index.js",
+  "scripts": {
+    "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\" \"npm:dev:app\"",
+    "dev:renderer": "vite",
+    "dev:electron": "tsc -p tsconfig.electron.json --watch",
+    "dev:app": "wait-on tcp:5173 file:dist-electron/main/index.js && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
+    "build": "npm run typecheck && vite build && tsc -p tsconfig.electron.json",
+    "start": "electron .",
+    "dist": "npm run build && electron-builder"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^41.1.0",
+    "electron-builder": "^26.8.1",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.3",
+    "wait-on": "^9.0.4"
+  },
+  "build": {
+    "appId": "com.biscuitclone.app",
+    "productName": "Biscuit Clone",
+    "directories": {
+      "output": "out"
+    },
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "node_modules/**",
+      "package.json"
+    ],
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
+  }
+}
