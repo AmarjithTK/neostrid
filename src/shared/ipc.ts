@@ -5,7 +5,10 @@ export const IPC_CHANNELS = {
   getState: "state:get",
   saveState: "state:save",
   deleteContainerAndCleanup: "container:deleteAndCleanup",
-  clearAppData: "app:clearData"
+  clearAppData: "app:clearData",
+  windowMinimize: "window:minimize",
+  windowToggleMaximize: "window:toggleMaximize",
+  windowClose: "window:close"
 } as const;
 
 export type PingResponse = {
@@ -20,6 +23,9 @@ export type AppApi = {
   saveState: (nextState: PersistedAppState) => Promise<PersistedAppState>;
   deleteContainerAndCleanup: (containerName: string) => Promise<void>;
   clearAppData: (appId: string) => Promise<void>;
+  minimizeWindow: () => Promise<void>;
+  toggleMaximizeWindow: () => Promise<void>;
+  closeWindow: () => Promise<void>;
 };
 
 declare global {

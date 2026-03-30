@@ -18,6 +18,15 @@ const appApi: AppApi = {
   },
   clearAppData: async (appId: string): Promise<void> => {
     return ipcRenderer.invoke(IPC_CHANNELS.clearAppData, appId);
+  },
+  minimizeWindow: async (): Promise<void> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.windowMinimize);
+  },
+  toggleMaximizeWindow: async (): Promise<void> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.windowToggleMaximize);
+  },
+  closeWindow: async (): Promise<void> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.windowClose);
   }
 };
 

@@ -63,13 +63,13 @@ async function writeStateToDisk(nextState: PersistedAppState): Promise<void> {
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 1320,
-    height: 860,
-    minWidth: 1024,
-    minHeight: 680,
+    width: 1480,
+    height: 900,
+    minWidth: 1200,
+    minHeight: 760,
     autoHideMenuBar: true,
+    frame: false,
     backgroundColor: "#111827",
-    titleBarStyle: "hiddenInset",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,              // Isolate preload from renderer context
@@ -180,6 +180,30 @@ app.whenReady().then(() => {
     } catch (err) {
       console.error(`Failed to clear storage for app ${appId}:`, err);
     }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.windowMinimize, (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    win?.minimize();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.windowToggleMaximize, (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) {
+      return;
+    }
+
+    if (win.isMaximized()) {
+      win.unmaximize();
+      return;
+    }
+
+    win.maximize();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.windowClose, (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    win?.close();
   });
 
   createWindow();

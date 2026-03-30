@@ -8,6 +8,34 @@
   box-sizing: border-box;
 }
 
+/* App-level scrollbar theme */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(107, 114, 128, 0.55) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(107, 114, 128, 0.45);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(75, 85, 99, 0.7);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
 html,
 body,
 #root {
@@ -28,24 +56,13 @@ body {
 
 .chrome-bar {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   padding: 10px 14px;
   background: #ffffff;
   border-bottom: 1px solid #e5e7eb;
-}
-
-.traffic-controls {
-  display: flex;
-  gap: 6px;
-}
-
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #d1d5db;
+  -webkit-app-region: drag;
 }
 
 .address-pill {
@@ -58,6 +75,7 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  -webkit-app-region: drag;
 }
 
 .ghost-button {
@@ -73,8 +91,37 @@ body {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
+  -webkit-app-region: no-drag;
+}
+
+.window-controls-right {
+  display: inline-flex;
+  margin-left: 6px;
+  gap: 2px;
+}
+
+.window-control-button {
+  width: 30px;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #475569;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.window-control-button:hover {
+  background: #e5e7eb;
+}
+
+.window-control-button.close:hover {
+  background: #ef4444;
+  color: #ffffff;
 }
 
 .hidden-file-input {
@@ -85,6 +132,10 @@ body {
   display: grid;
   grid-template-columns: 248px 1fr;
   height: calc(100vh - 56px);
+}
+
+.layout.compact {
+  grid-template-columns: 96px 1fr;
 }
 
 .sidebar {
@@ -100,6 +151,25 @@ body {
   margin: 2px 8px 10px;
 }
 
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 6px 8px;
+}
+
+.compact-toggle {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #374151;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
 .workspace-tabs {
   display: flex;
   flex-direction: column;
@@ -108,6 +178,9 @@ body {
 }
 
 .workspace-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   border: 1px solid transparent;
   background: #f3f4f6;
@@ -117,6 +190,11 @@ body {
   text-align: left;
   font-size: 0.8rem;
   cursor: pointer;
+}
+
+.workspace-pill i {
+  width: 14px;
+  text-align: center;
 }
 
 .workspace-pill.add {
@@ -165,6 +243,53 @@ body {
   gap: 6px;
 }
 
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.preset-chip {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #374151;
+  padding: 6px 8px;
+  font-size: 0.73rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.preset-chip:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.icon-picker {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.icon-choice {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #374151;
+  min-height: 30px;
+  cursor: pointer;
+}
+
+.icon-choice.active,
+.icon-choice:hover {
+  border-color: #111827;
+  color: #111827;
+  background: #f3f4f6;
+}
+
 .add-app-input {
   border: 1px solid #d1d5db;
   border-radius: 8px;
@@ -191,9 +316,9 @@ body {
   padding: 7px 10px;
   text-align: left;
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   transition: background-color 150ms ease, border-color 150ms ease;
 }
 
@@ -235,9 +360,48 @@ body {
   font-weight: 600;
 }
 
+.app-labels {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
 .app-subtitle {
   color: #9ca3af;
   font-size: 0.73rem;
+}
+
+.app-icon-wrap {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.app-icon {
+  font-size: 0.95rem;
+}
+
+.app-instance-badge {
+  position: absolute;
+  top: -6px;
+  right: -7px;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  font-size: 0.62rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
 }
 
 .main-panel {
@@ -381,12 +545,33 @@ h1 {
 }
 
 .browser-panel {
+  position: relative;
   border: 1px solid #d1d5db;
   border-radius: 14px;
   background: #ffffff;
   min-height: 0;
   flex: 1;
+  width: 100%;
   overflow: hidden;
+}
+
+.browser-panel.switching::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(243, 244, 246, 0.2);
+  pointer-events: none;
+  animation: panel-fade 180ms ease;
+  z-index: 3;
+}
+
+@keyframes panel-fade {
+  0% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 .webview-stack {
@@ -425,15 +610,66 @@ h1 {
 
 .toolbar-icon-button {
   border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background: #111827;
-  color: #f9fafb;
-  width: 32px;
-  height: 32px;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #475569;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  font-size: 0.95rem;
+  font-size: 0.82rem;
   line-height: 1;
   cursor: pointer;
+}
+
+.toolbar-icon-button:hover {
+  background: #f3f4f6;
+}
+
+.settings-trigger {
+  width: 28px;
+  height: 28px;
+}
+
+.layout.compact .app-subtitle {
+  display: none;
+}
+
+.layout.compact .section-label {
+  display: none;
+}
+
+.layout.compact .brand {
+  display: none;
+}
+
+.layout.compact .sidebar-head {
+  justify-content: flex-end;
+}
+
+.layout.compact .workspace-pill {
+  justify-content: center;
+  padding: 7px;
+}
+
+.layout.compact .workspace-pill span {
+  display: none;
+}
+
+.layout.compact .app-item-row {
+  grid-template-columns: 1fr;
+}
+
+.layout.compact .app-item {
+  justify-content: center;
+  padding: 9px 7px;
+}
+
+.layout.compact .app-labels {
+  display: none;
+}
+
+.layout.compact .app-item-remove {
+  display: none;
 }
 
 .container-indicator {
@@ -535,6 +771,7 @@ h1 {
   background: #ffffff;
   padding: 12px;
   box-shadow: 0 18px 34px rgba(17, 24, 39, 0.18);
+  -webkit-app-region: no-drag;
 }
 
 .settings-heading {

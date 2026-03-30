@@ -13,6 +13,127 @@ type BrowserWebviewElement = HTMLElement & {
   goBack: () => void;
   goForward: () => void;
   reload: () => void;
+  insertCSS: (css: string) => Promise<string>;
+  executeJavaScript: <T = unknown>(code: string, userGesture?: boolean) => Promise<T>;
+};
+
+type AppPreset = {
+  id: string;
+  name: string;
+  subtitle: string;
+  url: string;
+  iconClass: string;
+};
+
+const ICON_CHOICES = [
+  "fa-solid fa-globe",
+  "fa-brands fa-whatsapp",
+  "fa-brands fa-amazon",
+  "fa-brands fa-google",
+  "fa-brands fa-youtube",
+  "fa-brands fa-telegram",
+  "fa-brands fa-discord",
+  "fa-brands fa-slack",
+  "fa-brands fa-github",
+  "fa-brands fa-linkedin",
+  "fa-brands fa-twitter",
+  "fa-brands fa-reddit",
+  "fa-solid fa-envelope",
+  "fa-solid fa-briefcase",
+  "fa-solid fa-cart-shopping",
+  "fa-solid fa-music",
+  "fa-solid fa-cloud",
+  "fa-solid fa-calendar",
+  "fa-solid fa-bookmark",
+  "fa-solid fa-comments",
+  "fa-solid fa-newspaper",
+  "fa-solid fa-graduation-cap"
+];
+
+const APP_PRESETS: AppPreset[] = [
+  {
+    id: "whatsapp",
+    name: "WhatsApp",
+    subtitle: "Messages",
+    url: "https://web.whatsapp.com",
+    iconClass: "fa-brands fa-whatsapp"
+  },
+  {
+    id: "amazon",
+    name: "Amazon",
+    subtitle: "Shopping",
+    url: "https://www.amazon.com",
+    iconClass: "fa-brands fa-amazon"
+  },
+  {
+    id: "youtube",
+    name: "YouTube",
+    subtitle: "Videos",
+    url: "https://www.youtube.com",
+    iconClass: "fa-brands fa-youtube"
+  },
+  {
+    id: "slack",
+    name: "Slack",
+    subtitle: "Workspace chat",
+    url: "https://app.slack.com/client",
+    iconClass: "fa-brands fa-slack"
+  },
+  {
+    id: "discord",
+    name: "Discord",
+    subtitle: "Communities",
+    url: "https://discord.com/app",
+    iconClass: "fa-brands fa-discord"
+  },
+  {
+    id: "telegram",
+    name: "Telegram",
+    subtitle: "Cloud chat",
+    url: "https://web.telegram.org",
+    iconClass: "fa-brands fa-telegram"
+  },
+  {
+    id: "github",
+    name: "GitHub",
+    subtitle: "Repos",
+    url: "https://github.com",
+    iconClass: "fa-brands fa-github"
+  },
+  {
+    id: "notion",
+    name: "Notion",
+    subtitle: "Docs",
+    url: "https://www.notion.so",
+    iconClass: "fa-solid fa-note-sticky"
+  },
+  {
+    id: "linkedin",
+    name: "LinkedIn",
+    subtitle: "Network",
+    url: "https://www.linkedin.com",
+    iconClass: "fa-brands fa-linkedin"
+  },
+  {
+    id: "reddit",
+    name: "Reddit",
+    subtitle: "Communities",
+    url: "https://www.reddit.com",
+    iconClass: "fa-brands fa-reddit"
+  }
+];
+
+const getWorkspaceIconClass = (label: string): string => {
+  const normalized = label.trim().toLowerCase();
+  if (normalized.includes("work")) {
+    return "fa-solid fa-briefcase";
+  }
+
+  if (normalized.includes("personal")) {
+    return "fa-solid fa-user";
+  }
+
+  return "fa-solid fa-layer-group";
 };
 
 export default function App() {
@@ -28,8 +149,12 @@ export default function App() {
   const [renameContainerName, setRenameContainerName] = useState<string>("");
   const [newAppName, setNewAppName] = useState<string>("");
   const [newAppUrl, setNewAppUrl] = useState<string>("");
+  const [newAppIconClass, setNewAppIconClass] = useState<string>(ICON_CHOICES[0]);
+  const [newAppWorkspaceId, setNewAppWorkspaceId] = useState<string>(DEFAULT_APP_STATE.viewState.activeWorkspaceId);
   const [showAddApp, setShowAddApp] = useState<boolean>(false);
+  const [compactSidebar, setCompactSidebar] = useState<boolean>(false);
   const [mountedWebviewIds, setMountedWebviewIds] = useState<string[]>([]);
+  const [isSwitchingApp, setIsSwitchingApp] = useState<boolean>(false);
   const [loaded, setLoaded] = useState<boolean>(false);
   const saveTimeoutRef = useRef<number | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -43,6 +168,30 @@ export default function App() {
     () => apps.filter((item) => item.workspaceId === activeWorkspace),
     [activeWorkspace, apps]
   );
+
+  const duplicateBadgeById = useMemo(() => {
+    const totals = new Map<string, number>();
+    const order = new Map<string, number>();
+    const badges = new Map<string, number>();
+
+    for (const item of workspaceApps) {
+      const key = item.name.trim().toLowerCase();
+      totals.set(key, (totals.get(key) ?? 0) + 1);
+    }
+
+    for (const item of workspaceApps) {
+      const key = item.name.trim().toLowerCase();
+      if ((totals.get(key) ?? 0) <= 1) {
+        continue;
+      }
+
+      const nextIndex = (order.get(key) ?? 0) + 1;
+      order.set(key, nextIndex);
+      badges.set(item.id, nextIndex);
+    }
+
+    return badges;
+  }, [workspaceApps]);
 
   const filteredApps = useMemo(() => {
     if (!query.trim()) {
@@ -188,6 +337,21 @@ export default function App() {
   }, [workspaceApps, activeAppId]);
 
   useEffect(() => {
+    if (!activeAppId) {
+      return;
+    }
+
+    setIsSwitchingApp(true);
+    const timeoutId = window.setTimeout(() => {
+      setIsSwitchingApp(false);
+    }, 180);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [activeAppId]);
+
+  useEffect(() => {
     if (!activeApp) {
       return;
     }
@@ -288,6 +452,38 @@ export default function App() {
     );
   };
 
+  const confirmContainerModeSwitch = (nextContainer: string): boolean => {
+    if (!activeApp) {
+      return false;
+    }
+
+    const currentContainer = activeApp.container;
+    if (currentContainer === nextContainer) {
+      return false;
+    }
+
+    const switchingToStandalone = currentContainer !== "Standalone" && nextContainer === "Standalone";
+    const switchingToContainer = currentContainer === "Standalone" && nextContainer !== "Standalone";
+
+    if (!switchingToStandalone && !switchingToContainer) {
+      return true;
+    }
+
+    const message = switchingToStandalone
+      ? `Switch ${activeApp.name} to Standalone? It will stop sharing session data with container "${currentContainer}".`
+      : `Switch ${activeApp.name} to container "${nextContainer}"? It will use that container's shared login/session.`;
+
+    return window.confirm(message);
+  };
+
+  const requestContainerSwitch = (nextContainer: string) => {
+    if (!confirmContainerModeSwitch(nextContainer)) {
+      return;
+    }
+
+    updateActiveAppContainer(nextContainer);
+  };
+
   const createContainerForActiveApp = () => {
     const trimmed = newContainerName.trim();
     if (!trimmed) {
@@ -371,9 +567,24 @@ export default function App() {
     await window.appApi.clearAppData(activeApp.id);
   };
 
+  const applyPresetToForm = (preset: AppPreset) => {
+    setNewAppName(preset.name);
+    setNewAppUrl(preset.url);
+    setNewAppIconClass(preset.iconClass);
+  };
+
+  const getIconClassForApp = (item: AppEntry): string => {
+    if (item.iconClass?.trim()) {
+      return item.iconClass;
+    }
+
+    return "fa-solid fa-globe";
+  };
+
   const createApp = () => {
     const trimmedName = newAppName.trim();
     const trimmedUrl = newAppUrl.trim();
+    const targetWorkspaceId = newAppWorkspaceId || activeWorkspace;
 
     if (!trimmedName || !trimmedUrl) {
       return;
@@ -390,23 +601,27 @@ export default function App() {
       const id = `${trimmedName.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`;
 
       const workspaceLabel =
-        workspaces.find((item) => item.id === activeWorkspace)?.label === "Personal" ? "Personal" : "Work";
+        workspaces.find((item) => item.id === targetWorkspaceId)?.label === "Personal" ? "Personal" : "Work";
 
       const nextApp: AppEntry = {
         id,
         name: trimmedName,
         subtitle: hostLabel,
         url: url.toString(),
+        iconClass: newAppIconClass,
         section: workspaceLabel,
-        workspaceId: activeWorkspace,
+        workspaceId: targetWorkspaceId,
         container: "Standalone"
       };
 
       setApps((prev) => [...prev, nextApp]);
+      setActiveWorkspace(targetWorkspaceId);
       setActiveAppId(nextApp.id);
       setShowAddApp(false);
       setNewAppName("");
       setNewAppUrl("");
+      setNewAppIconClass(ICON_CHOICES[0]);
+      setNewAppWorkspaceId(activeWorkspace);
     } catch {
       return;
     }
@@ -487,13 +702,6 @@ export default function App() {
     }
   };
 
-  const groupedApps = useMemo(() => {
-    return {
-      Work: workspaceApps.filter((item) => item.section === "Work"),
-      Personal: workspaceApps.filter((item) => item.section === "Personal")
-    };
-  }, [workspaceApps]);
-
   const mountedApps = useMemo(() => {
     const orderedIds = activeApp
       ? [activeApp.id, ...mountedWebviewIds.filter((id) => id !== activeApp.id)]
@@ -529,6 +737,38 @@ export default function App() {
       updateNavigationState();
     };
 
+    const applyGuestScrollbarTheme = () => {
+      // Keep guest-page scrollbar thin and subtle.
+      void webview.insertCSS(`
+        html, body {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(107, 114, 128, 0.55) transparent;
+        }
+
+        ::-webkit-scrollbar {
+          width: 9px;
+          height: 9px;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+          background: rgba(107, 114, 128, 0.45);
+          border-radius: 999px;
+          border: 2px solid transparent;
+          background-clip: content-box;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+          background: rgba(75, 85, 99, 0.7);
+          border: 2px solid transparent;
+          background-clip: content-box;
+        }
+      `);
+    };
+
     const handleLoadFail = (event: Event) => {
       const failed = event as Event & { errorCode?: number; errorDescription?: string };
       if (failed.errorCode === -3) {
@@ -540,12 +780,17 @@ export default function App() {
       updateNavigationState();
     };
 
+    const handleDomReady = () => {
+      updateNavigationState();
+      applyGuestScrollbarTheme();
+    };
+
     webview.addEventListener("did-start-loading", handleStartLoading);
     webview.addEventListener("did-stop-loading", handleStopLoading);
     webview.addEventListener("did-fail-load", handleLoadFail);
     webview.addEventListener("did-navigate", updateNavigationState);
     webview.addEventListener("did-navigate-in-page", updateNavigationState);
-    webview.addEventListener("dom-ready", updateNavigationState);
+    webview.addEventListener("dom-ready", handleDomReady);
 
     return () => {
       webview.removeEventListener("did-start-loading", handleStartLoading);
@@ -553,18 +798,13 @@ export default function App() {
       webview.removeEventListener("did-fail-load", handleLoadFail);
       webview.removeEventListener("did-navigate", updateNavigationState);
       webview.removeEventListener("did-navigate-in-page", updateNavigationState);
-      webview.removeEventListener("dom-ready", updateNavigationState);
+      webview.removeEventListener("dom-ready", handleDomReady);
     };
   }, [activeAppId, activePartition, mountedWebviewIds]);
 
   return (
     <div className="app-shell">
       <header className="chrome-bar">
-        <div className="traffic-controls">
-          <span className="dot" />
-          <span className="dot" />
-          <span className="dot" />
-        </div>
         <div className="address-pill">{activeApp?.url ?? "https://"}</div>
         <div className="header-actions">
           <button
@@ -604,35 +844,104 @@ export default function App() {
           </span>
           <button
             type="button"
-            className="toolbar-icon-button"
+            className="toolbar-icon-button settings-trigger"
             aria-label="Open settings"
+            title="Settings"
             onClick={() => setSettingsOpen((prev) => !prev)}
           >
-            ⚙
+            <i className="fa-solid fa-gear" aria-hidden="true" />
           </button>
+          <div className="window-controls-right">
+            <button
+              type="button"
+              className="window-control-button"
+              aria-label="Minimize window"
+              onClick={() => void window.appApi.minimizeWindow()}
+            >
+              _
+            </button>
+            <button
+              type="button"
+              className="window-control-button"
+              aria-label="Maximize or restore window"
+              onClick={() => void window.appApi.toggleMaximizeWindow()}
+            >
+              □
+            </button>
+            <button
+              type="button"
+              className="window-control-button close"
+              aria-label="Close window"
+              onClick={() => void window.appApi.closeWindow()}
+            >
+              ×
+            </button>
+          </div>
         </div>
       </header>
 
-      <div className="layout">
+      <div className={`layout ${compactSidebar ? "compact" : ""}`}>
         <aside className="sidebar">
-          <div className="brand">Biscuit Clone</div>
+          <div className="sidebar-head">
+            <div className="brand">Biscuit Clone</div>
+            <button
+              type="button"
+              className="compact-toggle"
+              title={compactSidebar ? "Expand sidebar" : "Compact sidebar"}
+              aria-label={compactSidebar ? "Expand sidebar" : "Compact sidebar"}
+              onClick={() => setCompactSidebar((prev) => !prev)}
+            >
+              <i className={`fa-solid ${compactSidebar ? "fa-angles-right" : "fa-angles-left"}`} aria-hidden="true" />
+            </button>
+          </div>
           <div className="workspace-tabs">
-            <button type="button" className="workspace-pill add" onClick={() => setShowAddApp((prev) => !prev)}>
-              + Add App
+            <button
+              type="button"
+              className="workspace-pill add"
+              title={showAddApp ? "Close Add App" : "Add App"}
+              onClick={() => {
+                setShowAddApp((prev) => {
+                  const next = !prev;
+                  if (next) {
+                    setCompactSidebar(false);
+                    setNewAppWorkspaceId(activeWorkspace);
+                    setNewAppIconClass(ICON_CHOICES[0]);
+                  }
+                  return next;
+                });
+              }}
+            >
+              <i className={`fa-solid ${showAddApp ? "fa-xmark" : "fa-plus"}`} aria-hidden="true" />
+              <span>{showAddApp ? "Close" : "Add App"}</span>
             </button>
             {workspaces.map((workspace) => (
               <button
                 key={workspace.id}
                 type="button"
                 className={`workspace-pill ${activeWorkspace === workspace.id ? "active" : ""}`}
+                title={workspace.label}
                 onClick={() => setActiveWorkspace(workspace.id)}
               >
-                {workspace.label}
+                <i className={getWorkspaceIconClass(workspace.label)} aria-hidden="true" />
+                <span>{workspace.label}</span>
               </button>
             ))}
 
             {showAddApp ? (
               <div className="add-app-panel">
+                <div className="preset-grid" aria-label="App presets">
+                  {APP_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      className="preset-chip"
+                      onClick={() => applyPresetToForm(preset)}
+                    >
+                      <i className={preset.iconClass} aria-hidden="true" />
+                      <span>{preset.name}</span>
+                    </button>
+                  ))}
+                </div>
                 <input
                   className="add-app-input"
                   placeholder="App name"
@@ -645,6 +954,30 @@ export default function App() {
                   value={newAppUrl}
                   onChange={(event) => setNewAppUrl(event.target.value)}
                 />
+                <select
+                  className="add-app-input"
+                  value={newAppWorkspaceId}
+                  onChange={(event) => setNewAppWorkspaceId(event.target.value)}
+                >
+                  {workspaces.map((workspace) => (
+                    <option key={workspace.id} value={workspace.id}>
+                      {workspace.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="icon-picker" aria-label="Icon picker">
+                  {ICON_CHOICES.map((iconClass) => (
+                    <button
+                      key={iconClass}
+                      type="button"
+                      className={`icon-choice ${newAppIconClass === iconClass ? "active" : ""}`}
+                      title={iconClass}
+                      onClick={() => setNewAppIconClass(iconClass)}
+                    >
+                      <i className={iconClass} aria-hidden="true" />
+                    </button>
+                  ))}
+                </div>
                 <button type="button" className="add-app-submit" onClick={createApp}>
                   Save App
                 </button>
@@ -652,17 +985,26 @@ export default function App() {
             ) : null}
           </div>
 
-          <div className="section-label">Work</div>
+          <div className="section-label">Apps</div>
           <div className="app-list">
-            {groupedApps.Work.map((item) => (
+            {workspaceApps.map((item) => (
               <div key={item.id} className={`app-item-row ${activeAppId === item.id ? "active" : ""}`}>
                 <button
                   type="button"
                   className={`app-item ${activeAppId === item.id ? "active" : ""}`}
+                  title={item.name}
                   onClick={() => setActiveAppId(item.id)}
                 >
-                  <span className="app-title">{item.name}</span>
-                  <span className="app-subtitle">{item.subtitle}</span>
+                  <span className="app-icon-wrap">
+                    <i className={`app-icon ${getIconClassForApp(item)}`} aria-hidden="true" />
+                    {duplicateBadgeById.has(item.id) ? (
+                      <span className="app-instance-badge">{duplicateBadgeById.get(item.id)}</span>
+                    ) : null}
+                  </span>
+                  <span className="app-labels">
+                    <span className="app-title">{item.name}</span>
+                    <span className="app-subtitle">{item.subtitle}</span>
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -674,35 +1016,12 @@ export default function App() {
                 </button>
               </div>
             ))}
-          </div>
-
-          <div className="section-label">Personal</div>
-          <div className="app-list">
-            {groupedApps.Personal.map((item) => (
-              <div key={item.id} className={`app-item-row ${activeAppId === item.id ? "active" : ""}`}>
-                <button
-                  type="button"
-                  className={`app-item ${activeAppId === item.id ? "active" : ""}`}
-                  onClick={() => setActiveAppId(item.id)}
-                >
-                  <span className="app-title">{item.name}</span>
-                  <span className="app-subtitle">{item.subtitle}</span>
-                </button>
-                <button
-                  type="button"
-                  className="app-item-remove"
-                  aria-label={`Delete ${item.name}`}
-                  onClick={() => deleteAppById(item.id)}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
+            {workspaceApps.length === 0 ? <div className="empty-state">No apps in this workspace.</div> : null}
           </div>
         </aside>
 
         <main className="main-panel">
-          <div className="browser-panel">
+          <div className={`browser-panel ${isSwitchingApp ? "switching" : ""}`}>
             {activeApp ? (
               <div className="webview-stack">
                 {mountedApps.map((item) => {
@@ -768,7 +1087,7 @@ export default function App() {
                   <button
                     type="button"
                     className={`mode-button ${activeApp?.container === "Standalone" ? "active" : ""}`}
-                    onClick={() => updateActiveAppContainer("Standalone")}
+                    onClick={() => requestContainerSwitch("Standalone")}
                   >
                     Standalone
                   </button>
@@ -777,7 +1096,7 @@ export default function App() {
                     className={`mode-button ${activeApp?.container !== "Standalone" ? "active" : ""}`}
                     onClick={() => {
                       if (containerNames.length > 0) {
-                        updateActiveAppContainer(containerNames[0]);
+                        requestContainerSwitch(containerNames[0]);
                       }
                     }}
                   >
@@ -794,7 +1113,7 @@ export default function App() {
                       id="container-select"
                       className="container-select"
                       value={activeApp?.container ?? ""}
-                      onChange={(event) => updateActiveAppContainer(event.target.value)}
+                      onChange={(event) => requestContainerSwitch(event.target.value)}
                     >
                       {containerNames.map((container) => (
                         <option key={container} value={container}>

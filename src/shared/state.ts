@@ -7,6 +7,7 @@ export const APP_ENTRY_SCHEMA = z.object({
   name: z.string().min(1),
   subtitle: z.string().min(1),
   url: z.string().url(),
+  iconClass: z.string().min(1).optional(),
   section: z.enum(["Work", "Personal"]),
   workspaceId: z.string().min(1),
   container: z.string().min(1)
@@ -46,6 +47,7 @@ export const DEFAULT_APP_STATE: PersistedAppState = {
       name: "Gmail",
       subtitle: "Work account",
       url: "https://mail.google.com",
+      iconClass: "fa-solid fa-envelope",
       section: "Work",
       workspaceId: "work",
       container: "Container A"
@@ -55,6 +57,7 @@ export const DEFAULT_APP_STATE: PersistedAppState = {
       name: "Drive",
       subtitle: "Work files",
       url: "https://drive.google.com",
+      iconClass: "fa-brands fa-google-drive",
       section: "Work",
       workspaceId: "work",
       container: "Container A"
@@ -64,6 +67,7 @@ export const DEFAULT_APP_STATE: PersistedAppState = {
       name: "Calendar",
       subtitle: "Team schedule",
       url: "https://calendar.google.com/calendar/r",
+      iconClass: "fa-regular fa-calendar",
       section: "Work",
       workspaceId: "work",
       container: "Container A"
@@ -73,6 +77,7 @@ export const DEFAULT_APP_STATE: PersistedAppState = {
       name: "Notion",
       subtitle: "Project docs",
       url: "https://www.notion.so",
+      iconClass: "fa-solid fa-note-sticky",
       section: "Work",
       workspaceId: "work",
       container: "Container A"
@@ -82,6 +87,7 @@ export const DEFAULT_APP_STATE: PersistedAppState = {
       name: "GitHub",
       subtitle: "Code reviews",
       url: "https://github.com",
+      iconClass: "fa-brands fa-github",
       section: "Work",
       workspaceId: "work",
       container: "Standalone"
@@ -91,6 +97,7 @@ export const DEFAULT_APP_STATE: PersistedAppState = {
       name: "Gmail",
       subtitle: "Personal account",
       url: "https://mail.google.com",
+      iconClass: "fa-solid fa-envelope",
       section: "Personal",
       workspaceId: "personal",
       container: "Container B"
@@ -100,6 +107,7 @@ export const DEFAULT_APP_STATE: PersistedAppState = {
       name: "Drive",
       subtitle: "Personal files",
       url: "https://drive.google.com",
+      iconClass: "fa-brands fa-google-drive",
       section: "Personal",
       workspaceId: "personal",
       container: "Container B"
@@ -109,6 +117,7 @@ export const DEFAULT_APP_STATE: PersistedAppState = {
       name: "Messenger",
       subtitle: "Friends and family",
       url: "https://www.messenger.com",
+      iconClass: "fa-brands fa-facebook-messenger",
       section: "Personal",
       workspaceId: "personal",
       container: "Standalone"
