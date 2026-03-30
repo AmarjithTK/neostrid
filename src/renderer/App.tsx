@@ -29,10 +29,11 @@ export default function App() {
   const [newAppName, setNewAppName] = useState<string>("");
   const [newAppUrl, setNewAppUrl] = useState<string>("");
   const [showAddApp, setShowAddApp] = useState<boolean>(false);
+  const [mountedWebviewIds, setMountedWebviewIds] = useState<string[]>([]);
   const [loaded, setLoaded] = useState<boolean>(false);
   const saveTimeoutRef = useRef<number | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
-  const webviewRef = useRef<BrowserWebviewElement | null>(null);
+  const webviewRefs = useRef<Record<string, BrowserWebviewElement | null>>({});
   const [isPageLoading, setIsPageLoading] = useState<boolean>(false);
   const [canGoBack, setCanGoBack] = useState<boolean>(false);
   const [canGoForward, setCanGoForward] = useState<boolean>(false);
@@ -83,18 +84,30 @@ export default function App() {
     return navigator.userAgent.replace(/\sElectron\/[^\s]+/gi, "");
   }, []);
 
+  const getPartitionForApp = (item: AppEntry): string => {
+    if (item.container === "Standalone") {
+      return `persist:app_${item.id}`;
+    }
+
+    const slug = item.container.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    return `persist:container_${slug || "default"}`;
+  };
+
   const activePartition = useMemo(() => {
     if (!activeApp) {
       return "persist:standalone";
     }
 
-    if (activeApp.container === "Standalone") {
-      return `persist:app_${activeApp.id}`;
+    return getPartitionForApp(activeApp);
+  }, [activeApp]);
+
+  const getActiveWebview = (): BrowserWebviewElement | null => {
+    if (!activeApp) {
+      return null;
     }
 
-    const slug = activeApp.container.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    return `persist:container_${slug || "default"}`;
-  }, [activeApp]);
+    return webviewRefs.current[activeApp.id] ?? null;
+  };
 
   useEffect(() => {
     window.appApi
@@ -173,6 +186,31 @@ export default function App() {
       setActiveAppId(workspaceApps[0].id);
     }
   }, [workspaceApps, activeAppId]);
+
+  useEffect(() => {
+    if (!activeApp) {
+      return;
+    }
+
+    setMountedWebviewIds((prev) => {
+      if (prev.includes(activeApp.id)) {
+        return prev;
+      }
+
+      return [...prev, activeApp.id];
+    });
+  }, [activeApp]);
+
+  useEffect(() => {
+    const appIdSet = new Set(apps.map((item) => item.id));
+    setMountedWebviewIds((prev) => prev.filter((id) => appIdSet.has(id)));
+
+    for (const id of Object.keys(webviewRefs.current)) {
+      if (!appIdSet.has(id)) {
+        delete webviewRefs.current[id];
+      }
+    }
+  }, [apps]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -379,10 +417,24 @@ export default function App() {
       return;
     }
 
-    const keep = apps.filter((item) => item.id !== activeApp.id);
+    deleteAppById(activeApp.id);
+  };
+
+  const deleteAppById = (appId: string) => {
+    const target = apps.find((item) => item.id === appId);
+    if (!target) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete ${target.name}?`);
+    if (!confirmed) {
+      return;
+    }
+
+    const keep = apps.filter((item) => item.id !== appId);
     setApps(keep);
 
-    const nextInWorkspace = keep.find((item) => item.workspaceId === activeWorkspace);
+    const nextInWorkspace = keep.find((item) => item.workspaceId === target.workspaceId);
     setActiveAppId(nextInWorkspace?.id ?? keep[0]?.id ?? "");
   };
 
@@ -442,9 +494,22 @@ export default function App() {
     };
   }, [workspaceApps]);
 
+  const mountedApps = useMemo(() => {
+    const orderedIds = activeApp
+      ? [activeApp.id, ...mountedWebviewIds.filter((id) => id !== activeApp.id)]
+      : mountedWebviewIds;
+
+    return orderedIds
+      .map((id) => apps.find((item) => item.id === id))
+      .filter((item): item is AppEntry => Boolean(item));
+  }, [activeApp, apps, mountedWebviewIds]);
+
   useEffect(() => {
-    const webview = webviewRef.current;
+    const webview = getActiveWebview();
     if (!webview) {
+      setIsPageLoading(false);
+      setCanGoBack(false);
+      setCanGoForward(false);
       return;
     }
 
@@ -490,7 +555,7 @@ export default function App() {
       webview.removeEventListener("did-navigate-in-page", updateNavigationState);
       webview.removeEventListener("dom-ready", updateNavigationState);
     };
-  }, [activeAppId, activePartition]);
+  }, [activeAppId, activePartition, mountedWebviewIds]);
 
   return (
     <div className="app-shell">
@@ -506,7 +571,7 @@ export default function App() {
             type="button"
             className="toolbar-button"
             disabled={!canGoBack}
-            onClick={() => webviewRef.current?.goBack()}
+            onClick={() => getActiveWebview()?.goBack()}
           >
             Back
           </button>
@@ -514,11 +579,11 @@ export default function App() {
             type="button"
             className="toolbar-button"
             disabled={!canGoForward}
-            onClick={() => webviewRef.current?.goForward()}
+            onClick={() => getActiveWebview()?.goForward()}
           >
             Forward
           </button>
-          <button type="button" className="toolbar-button" onClick={() => webviewRef.current?.reload()}>
+          <button type="button" className="toolbar-button" onClick={() => getActiveWebview()?.reload()}>
             Reload
           </button>
           <button type="button" className="toolbar-button" onClick={() => void toggleFullscreen()}>
@@ -590,30 +655,48 @@ export default function App() {
           <div className="section-label">Work</div>
           <div className="app-list">
             {groupedApps.Work.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={`app-item ${activeAppId === item.id ? "active" : ""}`}
-                onClick={() => setActiveAppId(item.id)}
-              >
-                <span className="app-title">{item.name}</span>
-                <span className="app-subtitle">{item.subtitle}</span>
-              </button>
+              <div key={item.id} className={`app-item-row ${activeAppId === item.id ? "active" : ""}`}>
+                <button
+                  type="button"
+                  className={`app-item ${activeAppId === item.id ? "active" : ""}`}
+                  onClick={() => setActiveAppId(item.id)}
+                >
+                  <span className="app-title">{item.name}</span>
+                  <span className="app-subtitle">{item.subtitle}</span>
+                </button>
+                <button
+                  type="button"
+                  className="app-item-remove"
+                  aria-label={`Delete ${item.name}`}
+                  onClick={() => deleteAppById(item.id)}
+                >
+                  ×
+                </button>
+              </div>
             ))}
           </div>
 
           <div className="section-label">Personal</div>
           <div className="app-list">
             {groupedApps.Personal.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={`app-item ${activeAppId === item.id ? "active" : ""}`}
-                onClick={() => setActiveAppId(item.id)}
-              >
-                <span className="app-title">{item.name}</span>
-                <span className="app-subtitle">{item.subtitle}</span>
-              </button>
+              <div key={item.id} className={`app-item-row ${activeAppId === item.id ? "active" : ""}`}>
+                <button
+                  type="button"
+                  className={`app-item ${activeAppId === item.id ? "active" : ""}`}
+                  onClick={() => setActiveAppId(item.id)}
+                >
+                  <span className="app-title">{item.name}</span>
+                  <span className="app-subtitle">{item.subtitle}</span>
+                </button>
+                <button
+                  type="button"
+                  className="app-item-remove"
+                  aria-label={`Delete ${item.name}`}
+                  onClick={() => deleteAppById(item.id)}
+                >
+                  ×
+                </button>
+              </div>
             ))}
           </div>
         </aside>
@@ -621,15 +704,26 @@ export default function App() {
         <main className="main-panel">
           <div className="browser-panel">
             {activeApp ? (
-              <webview
-                ref={webviewRef}
-                key={`${activeApp.id}-${activePartition}`}
-                src={activeApp.url}
-                partition={activePartition}
-                className="webview-host"
-                useragent={webviewUserAgent}
-                allowpopups={false}
-              />
+              <div className="webview-stack">
+                {mountedApps.map((item) => {
+                  const partition = getPartitionForApp(item);
+                  const isActive = item.id === activeApp.id;
+
+                  return (
+                    <webview
+                      ref={(node) => {
+                        webviewRefs.current[item.id] = node as BrowserWebviewElement | null;
+                      }}
+                      key={`${item.id}-${partition}`}
+                      src={item.url}
+                      partition={partition}
+                      className={`webview-host ${isActive ? "active" : "hidden"}`}
+                      useragent={webviewUserAgent}
+                      allowpopups={false}
+                    />
+                  );
+                })}
+              </div>
             ) : (
               <div className="webview-empty">Create or select an app to start browsing.</div>
             )}
