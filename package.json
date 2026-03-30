@@ -12,7 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "build": "npm run typecheck && vite build && tsc -p tsconfig.electron.json",
     "start": "electron .",
-    "dist": "npm run clean:out && npm run build && electron-builder",
+    "dist": "npm run clean:out && npm run build && npx electron-builder",
     "make": "npm run dist"
   },
   "keywords": [],
