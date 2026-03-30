@@ -8,6 +8,14 @@ import {
   type Workspace
 } from "../shared/state";
 
+type BrowserWebviewElement = HTMLElement & {
+  canGoBack: () => boolean;
+  canGoForward: () => boolean;
+  goBack: () => void;
+  goForward: () => void;
+  reload: () => void;
+};
+
 export default function App() {
   const [apps, setApps] = useState<AppEntry[]>(DEFAULT_APP_STATE.apps);
   const [workspaces, setWorkspaces] = useState<Workspace[]>(DEFAULT_APP_STATE.workspaces);
@@ -24,6 +32,11 @@ export default function App() {
   const [loaded, setLoaded] = useState<boolean>(false);
   const saveTimeoutRef = useRef<number | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const webviewRef = useRef<BrowserWebviewElement | null>(null);
+  const [isPageLoading, setIsPageLoading] = useState<boolean>(false);
+  const [canGoBack, setCanGoBack] = useState<boolean>(false);
+  const [canGoForward, setCanGoForward] = useState<boolean>(false);
+  const [lastLoadError, setLastLoadError] = useState<string>("");
 
   const workspaceApps = useMemo(
     () => apps.filter((item) => item.workspaceId === activeWorkspace),
@@ -61,6 +74,19 @@ export default function App() {
 
     return apps.filter((item) => item.container === activeApp.container);
   }, [activeApp, apps]);
+
+  const activePartition = useMemo(() => {
+    if (!activeApp) {
+      return "persist:standalone";
+    }
+
+    if (activeApp.container === "Standalone") {
+      return `persist:app_${activeApp.id}`;
+    }
+
+    const slug = activeApp.container.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    return `persist:container_${slug || "default"}`;
+  }, [activeApp]);
 
   useEffect(() => {
     window.appApi.ping("renderer-ready").then(setPong).catch(() => {
@@ -317,6 +343,56 @@ export default function App() {
     };
   }, [workspaceApps]);
 
+  useEffect(() => {
+    const webview = webviewRef.current;
+    if (!webview) {
+      return;
+    }
+
+    const updateNavigationState = () => {
+      setCanGoBack(webview.canGoBack());
+      setCanGoForward(webview.canGoForward());
+    };
+
+    const handleStartLoading = () => {
+      setIsPageLoading(true);
+      setLastLoadError("");
+      updateNavigationState();
+    };
+
+    const handleStopLoading = () => {
+      setIsPageLoading(false);
+      updateNavigationState();
+    };
+
+    const handleLoadFail = (event: Event) => {
+      const failed = event as Event & { errorCode?: number; errorDescription?: string };
+      if (failed.errorCode === -3) {
+        return;
+      }
+
+      setIsPageLoading(false);
+      setLastLoadError(failed.errorDescription || "Failed to load page");
+      updateNavigationState();
+    };
+
+    webview.addEventListener("did-start-loading", handleStartLoading);
+    webview.addEventListener("did-stop-loading", handleStopLoading);
+    webview.addEventListener("did-fail-load", handleLoadFail);
+    webview.addEventListener("did-navigate", updateNavigationState);
+    webview.addEventListener("did-navigate-in-page", updateNavigationState);
+    webview.addEventListener("dom-ready", updateNavigationState);
+
+    return () => {
+      webview.removeEventListener("did-start-loading", handleStartLoading);
+      webview.removeEventListener("did-stop-loading", handleStopLoading);
+      webview.removeEventListener("did-fail-load", handleLoadFail);
+      webview.removeEventListener("did-navigate", updateNavigationState);
+      webview.removeEventListener("did-navigate-in-page", updateNavigationState);
+      webview.removeEventListener("dom-ready", updateNavigationState);
+    };
+  }, [activeAppId, activePartition]);
+
   return (
     <div className="app-shell">
       <header className="chrome-bar">
@@ -492,13 +568,44 @@ export default function App() {
             ) : null}
           </section>
 
-          <div className="content-mock">
-            <div className="calendar-strip" />
-            <div className="calendar-strip" />
-            <div className="calendar-strip" />
-            <div className="calendar-strip" />
-            <div className="calendar-strip" />
-            <div className="calendar-strip" />
+          <div className="browser-panel">
+            <div className="browser-toolbar">
+              <button
+                type="button"
+                className="toolbar-button"
+                disabled={!canGoBack}
+                onClick={() => webviewRef.current?.goBack()}
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                className="toolbar-button"
+                disabled={!canGoForward}
+                onClick={() => webviewRef.current?.goForward()}
+              >
+                Forward
+              </button>
+              <button type="button" className="toolbar-button" onClick={() => webviewRef.current?.reload()}>
+                Reload
+              </button>
+              <span className="toolbar-state">
+                {isPageLoading ? "Loading..." : lastLoadError ? `Error: ${lastLoadError}` : activePartition}
+              </span>
+            </div>
+
+            {activeApp ? (
+              <webview
+                ref={webviewRef}
+                key={`${activeApp.id}-${activePartition}`}
+                src={activeApp.url}
+                partition={activePartition}
+                className="webview-host"
+                allowpopups={false}
+              />
+            ) : (
+              <div className="webview-empty">Create or select an app to start browsing.</div>
+            )}
           </div>
 
           <div className="ping-card">
