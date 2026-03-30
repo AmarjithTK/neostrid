@@ -12,6 +12,12 @@ const appApi: AppApi = {
   },
   saveState: async (nextState: PersistedAppState): Promise<PersistedAppState> => {
     return ipcRenderer.invoke(IPC_CHANNELS.saveState, nextState);
+  },
+  deleteContainerAndCleanup: async (containerName: string): Promise<void> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.deleteContainerAndCleanup, containerName);
+  },
+  clearAppData: async (appId: string): Promise<void> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.clearAppData, appId);
   }
 };
 

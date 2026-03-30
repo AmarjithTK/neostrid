@@ -295,6 +295,21 @@ body {
   cursor: pointer;
 }
 
+.danger-row {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.danger-action {
+  border: 1px solid #fecaca;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #991b1b;
+  padding: 7px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
 .members-line {
   font-size: 0.76rem;
   color: #6b7280;

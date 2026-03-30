@@ -26,6 +26,7 @@ export default function App() {
   const [query, setQuery] = useState<string>("");
   const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
   const [newContainerName, setNewContainerName] = useState<string>("");
+  const [renameContainerName, setRenameContainerName] = useState<string>("");
   const [newAppName, setNewAppName] = useState<string>("");
   const [newAppUrl, setNewAppUrl] = useState<string>("");
   const [showAddApp, setShowAddApp] = useState<boolean>(false);
@@ -74,6 +75,13 @@ export default function App() {
 
     return apps.filter((item) => item.container === activeApp.container);
   }, [activeApp, apps]);
+
+  const selectedContainerName = activeApp?.container ?? "Standalone";
+
+  const webviewUserAgent = useMemo(() => {
+    // Some sites reject Electron-specific UAs even when Chromium is modern.
+    return navigator.userAgent.replace(/\sElectron\/[^\s]+/gi, "");
+  }, []);
 
   const activePartition = useMemo(() => {
     if (!activeApp) {
@@ -149,6 +157,15 @@ export default function App() {
   useEffect(() => {
     setHighlightedIndex(0);
   }, [query, activeWorkspace, switcherOpen]);
+
+  useEffect(() => {
+    if (selectedContainerName === "Standalone") {
+      setRenameContainerName("");
+      return;
+    }
+
+    setRenameContainerName(selectedContainerName);
+  }, [selectedContainerName]);
 
   useEffect(() => {
     if (workspaceApps.length === 0) {
@@ -245,6 +262,79 @@ export default function App() {
 
     updateActiveAppContainer(trimmed);
     setNewContainerName("");
+  };
+
+  const renameActiveContainer = () => {
+    if (!activeApp || activeApp.container === "Standalone") {
+      return;
+    }
+
+    const nextName = renameContainerName.trim();
+    if (!nextName || nextName === activeApp.container) {
+      return;
+    }
+
+    setApps((prev) =>
+      prev.map((item) => {
+        if (item.container !== activeApp.container) {
+          return item;
+        }
+
+        return {
+          ...item,
+          container: nextName
+        };
+      })
+    );
+  };
+
+  const deleteActiveContainer = async () => {
+    if (!activeApp || activeApp.container === "Standalone") {
+      return;
+    }
+
+    const containerName = activeApp.container;
+    const memberCount = apps.filter((item) => item.container === containerName).length;
+    const confirmed = window.confirm(
+      `Delete ${containerName}? ${memberCount} app(s) will be moved to Standalone.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    // Clear session storage for this container partition
+    await window.appApi.deleteContainerAndCleanup(containerName);
+
+    // Update state to move all apps in this container to Standalone
+    setApps((prev) =>
+      prev.map((item) => {
+        if (item.container !== containerName) {
+          return item;
+        }
+
+        return {
+          ...item,
+          container: "Standalone"
+        };
+      })
+    );
+  };
+
+  const clearActiveAppData = async () => {
+    if (!activeApp) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Clear all data for ${activeApp.name}? This cannot be undone.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    await window.appApi.clearAppData(activeApp.id);
   };
 
   const createApp = () => {
@@ -502,6 +592,9 @@ export default function App() {
             <div className="app-meta">
               <span className="meta-chip">{activeWorkspace.toUpperCase()}</span>
               <span className="meta-chip">{activeApp?.container ?? "Standalone"}</span>
+              <button type="button" className="danger-chip" onClick={clearActiveAppData}>
+                Clear Data
+              </button>
               <button type="button" className="danger-chip" onClick={deleteActiveApp}>
                 Delete App
               </button>
@@ -561,6 +654,24 @@ export default function App() {
                   </button>
                 </div>
 
+                <div className="new-container-row">
+                  <input
+                    className="new-container-input"
+                    placeholder="Rename selected container"
+                    value={renameContainerName}
+                    onChange={(event) => setRenameContainerName(event.target.value)}
+                  />
+                  <button type="button" className="new-container-button" onClick={renameActiveContainer}>
+                    Rename
+                  </button>
+                </div>
+
+                <div className="danger-row">
+                  <button type="button" className="danger-action" onClick={() => void deleteActiveContainer()}>
+                    Delete Container
+                  </button>
+                </div>
+
                 <div className="members-line">
                   Members: {activeContainerMembers.map((item) => item.name).join(", ") || "None"}
                 </div>
@@ -601,6 +712,7 @@ export default function App() {
                 src={activeApp.url}
                 partition={activePartition}
                 className="webview-host"
+                useragent={webviewUserAgent}
                 allowpopups={false}
               />
             ) : (

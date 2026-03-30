@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, ipcMain, session, shell } from "electron";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { IPC_CHANNELS, type PingResponse } from "../shared/ipc";
@@ -41,10 +41,11 @@ function createWindow(): BrowserWindow {
     titleBarStyle: "hiddenInset",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false,
-      webviewTag: true
+      contextIsolation: true,              // Isolate preload from renderer context
+      nodeIntegration: false,              // Disable Node.js integration in renderer
+      sandbox: false,                      // Required for webviewTag to host browser tabs
+      webviewTag: true,                    // Enable webview tag for in-app browser
+      allowRunningInsecureContent: false   // Prevent mixed-content
     }
   });
 
@@ -68,6 +69,28 @@ app.whenReady().then(() => {
     appState = loaded;
   });
 
+  // Enforce CSP in production only. Dev/HMR needs broader script/connect allowances.
+  if (!isDev) {
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          "Content-Security-Policy": [
+            "default-src 'self' file:; " +
+            "script-src 'self' 'unsafe-inline'; " +
+            "style-src 'self' 'unsafe-inline'; " +
+            "img-src 'self' data: https: file:; " +
+            "font-src 'self' data: file:; " +
+            "connect-src 'self' https: file:; " +
+            "object-src 'none'; " +
+            "base-uri 'self'; " +
+            "form-action 'self';"
+          ]
+        }
+      });
+    });
+  }
+
   ipcMain.handle(IPC_CHANNELS.ping, (_event, message: string): PingResponse => {
     return {
       ok: true,
@@ -86,6 +109,29 @@ app.whenReady().then(() => {
     appState = parsed;
     await writeStateToDisk(parsed);
     return appState;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.deleteContainerAndCleanup, async (_event, containerName: string) => {
+    const slug = containerName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const partitionName = `persist:container_${slug || "default"}`;
+    
+    try {
+      const targetSession = session.fromPartition(partitionName);
+      await targetSession.clearStorageData();
+    } catch (err) {
+      console.error(`Failed to clear storage for container ${containerName}:`, err);
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.clearAppData, async (_event, appId: string) => {
+    const partitionName = `persist:app_${appId}`;
+    
+    try {
+      const targetSession = session.fromPartition(partitionName);
+      await targetSession.clearStorageData();
+    } catch (err) {
+      console.error(`Failed to clear storage for app ${appId}:`, err);
+    }
   });
 
   createWindow();
