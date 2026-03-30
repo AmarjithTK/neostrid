@@ -67,6 +67,7 @@ function createWindow(): BrowserWindow {
     height: 860,
     minWidth: 1024,
     minHeight: 680,
+    autoHideMenuBar: true,
     backgroundColor: "#111827",
     titleBarStyle: "hiddenInset",
     webPreferences: {
@@ -90,6 +91,8 @@ function createWindow(): BrowserWindow {
   } else {
     void win.loadFile(join(app.getAppPath(), "dist/index.html"));
   }
+
+  win.setMenuBarVisibility(false);
 
   return win;
 }

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import type { PingResponse } from "../shared/ipc";
 import {
   DEFAULT_APP_STATE,
   parsePersistedAppState,
@@ -19,10 +18,10 @@ type BrowserWebviewElement = HTMLElement & {
 export default function App() {
   const [apps, setApps] = useState<AppEntry[]>(DEFAULT_APP_STATE.apps);
   const [workspaces, setWorkspaces] = useState<Workspace[]>(DEFAULT_APP_STATE.workspaces);
-  const [pong, setPong] = useState<PingResponse | null>(null);
   const [activeWorkspace, setActiveWorkspace] = useState<string>(DEFAULT_APP_STATE.viewState.activeWorkspaceId);
   const [activeAppId, setActiveAppId] = useState<string>(DEFAULT_APP_STATE.viewState.activeAppId ?? "");
   const [switcherOpen, setSwitcherOpen] = useState<boolean>(false);
+  const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
   const [query, setQuery] = useState<string>("");
   const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
   const [newContainerName, setNewContainerName] = useState<string>("");
@@ -97,10 +96,6 @@ export default function App() {
   }, [activeApp]);
 
   useEffect(() => {
-    window.appApi.ping("renderer-ready").then(setPong).catch(() => {
-      setPong(null);
-    });
-
     window.appApi
       .getState()
       .then((state) => {
@@ -493,25 +488,35 @@ export default function App() {
         </div>
         <div className="address-pill">{activeApp?.url ?? "https://"}</div>
         <div className="header-actions">
-          <input
-            ref={importInputRef}
-            type="file"
-            accept="application/json"
-            className="hidden-file-input"
-            onChange={importState}
-          />
           <button
             type="button"
-            className="ghost-button"
-            onClick={() => importInputRef.current?.click()}
+            className="toolbar-button"
+            disabled={!canGoBack}
+            onClick={() => webviewRef.current?.goBack()}
           >
-            Import
+            Back
           </button>
-          <button type="button" className="ghost-button" onClick={exportState}>
-            Export
+          <button
+            type="button"
+            className="toolbar-button"
+            disabled={!canGoForward}
+            onClick={() => webviewRef.current?.goForward()}
+          >
+            Forward
           </button>
-          <button type="button" className="ghost-button" onClick={() => setSwitcherOpen(true)}>
-            Open Switcher
+          <button type="button" className="toolbar-button" onClick={() => webviewRef.current?.reload()}>
+            Reload
+          </button>
+          <span className="toolbar-state">
+            {isPageLoading ? "Loading..." : lastLoadError ? `Error: ${lastLoadError}` : activePartition}
+          </span>
+          <button
+            type="button"
+            className="settings-icon-button"
+            aria-label="Open settings"
+            onClick={() => setSettingsOpen((prev) => !prev)}
+          >
+            ⚙
           </button>
         </div>
       </header>
@@ -587,124 +592,7 @@ export default function App() {
         </aside>
 
         <main className="main-panel">
-          <div className="top-row">
-            <h1>{activeApp?.name ?? "No app selected"}</h1>
-            <div className="app-meta">
-              <span className="meta-chip">{activeWorkspace.toUpperCase()}</span>
-              <span className="meta-chip">{activeApp?.container ?? "Standalone"}</span>
-              <button type="button" className="danger-chip" onClick={clearActiveAppData}>
-                Clear Data
-              </button>
-              <button type="button" className="danger-chip" onClick={deleteActiveApp}>
-                Delete App
-              </button>
-            </div>
-          </div>
-
-          <section className="session-panel">
-            <div className="session-header">Session Mode</div>
-            <div className="mode-toggle">
-              <button
-                type="button"
-                className={`mode-button ${activeApp?.container === "Standalone" ? "active" : ""}`}
-                onClick={() => updateActiveAppContainer("Standalone")}
-              >
-                Standalone
-              </button>
-              <button
-                type="button"
-                className={`mode-button ${activeApp?.container !== "Standalone" ? "active" : ""}`}
-                onClick={() => {
-                  if (containerNames.length > 0) {
-                    updateActiveAppContainer(containerNames[0]);
-                  }
-                }}
-              >
-                Use Container
-              </button>
-            </div>
-
-            {activeApp?.container !== "Standalone" ? (
-              <div className="container-controls">
-                <label className="inline-label" htmlFor="container-select">
-                  Container
-                </label>
-                <select
-                  id="container-select"
-                  className="container-select"
-                  value={activeApp?.container ?? ""}
-                  onChange={(event) => updateActiveAppContainer(event.target.value)}
-                >
-                  {containerNames.map((container) => (
-                    <option key={container} value={container}>
-                      {container}
-                    </option>
-                  ))}
-                </select>
-
-                <div className="new-container-row">
-                  <input
-                    className="new-container-input"
-                    placeholder="Create container"
-                    value={newContainerName}
-                    onChange={(event) => setNewContainerName(event.target.value)}
-                  />
-                  <button type="button" className="new-container-button" onClick={createContainerForActiveApp}>
-                    Add
-                  </button>
-                </div>
-
-                <div className="new-container-row">
-                  <input
-                    className="new-container-input"
-                    placeholder="Rename selected container"
-                    value={renameContainerName}
-                    onChange={(event) => setRenameContainerName(event.target.value)}
-                  />
-                  <button type="button" className="new-container-button" onClick={renameActiveContainer}>
-                    Rename
-                  </button>
-                </div>
-
-                <div className="danger-row">
-                  <button type="button" className="danger-action" onClick={() => void deleteActiveContainer()}>
-                    Delete Container
-                  </button>
-                </div>
-
-                <div className="members-line">
-                  Members: {activeContainerMembers.map((item) => item.name).join(", ") || "None"}
-                </div>
-              </div>
-            ) : null}
-          </section>
-
           <div className="browser-panel">
-            <div className="browser-toolbar">
-              <button
-                type="button"
-                className="toolbar-button"
-                disabled={!canGoBack}
-                onClick={() => webviewRef.current?.goBack()}
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                className="toolbar-button"
-                disabled={!canGoForward}
-                onClick={() => webviewRef.current?.goForward()}
-              >
-                Forward
-              </button>
-              <button type="button" className="toolbar-button" onClick={() => webviewRef.current?.reload()}>
-                Reload
-              </button>
-              <span className="toolbar-state">
-                {isPageLoading ? "Loading..." : lastLoadError ? `Error: ${lastLoadError}` : activePartition}
-              </span>
-            </div>
-
             {activeApp ? (
               <webview
                 ref={webviewRef}
@@ -720,10 +608,118 @@ export default function App() {
             )}
           </div>
 
-          <div className="ping-card">
-            <div className="section-label light">Typed IPC Ping</div>
-            <pre>{pong ? JSON.stringify(pong, null, 2) : "Waiting for response..."}</pre>
-          </div>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json"
+            className="hidden-file-input"
+            onChange={importState}
+          />
+
+          {settingsOpen ? (
+            <div className="settings-overlay" role="presentation" onClick={() => setSettingsOpen(false)}>
+              <section className="settings-popup" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+                <div className="settings-heading">App Settings</div>
+
+                <div className="settings-actions">
+                  <button type="button" className="ghost-button" onClick={() => importInputRef.current?.click()}>
+                    Import
+                  </button>
+                  <button type="button" className="ghost-button" onClick={exportState}>
+                    Export
+                  </button>
+                  <button type="button" className="ghost-button" onClick={() => setSwitcherOpen(true)}>
+                    Open Switcher
+                  </button>
+                </div>
+
+                <div className="settings-actions">
+                  <button type="button" className="danger-chip" onClick={clearActiveAppData}>
+                    Clear Data
+                  </button>
+                  <button type="button" className="danger-chip" onClick={deleteActiveApp}>
+                    Delete App
+                  </button>
+                </div>
+
+                <div className="session-header">Session Mode</div>
+                <div className="mode-toggle">
+                  <button
+                    type="button"
+                    className={`mode-button ${activeApp?.container === "Standalone" ? "active" : ""}`}
+                    onClick={() => updateActiveAppContainer("Standalone")}
+                  >
+                    Standalone
+                  </button>
+                  <button
+                    type="button"
+                    className={`mode-button ${activeApp?.container !== "Standalone" ? "active" : ""}`}
+                    onClick={() => {
+                      if (containerNames.length > 0) {
+                        updateActiveAppContainer(containerNames[0]);
+                      }
+                    }}
+                  >
+                    Use Container
+                  </button>
+                </div>
+
+                {activeApp?.container !== "Standalone" ? (
+                  <div className="container-controls">
+                    <label className="inline-label" htmlFor="container-select">
+                      Container
+                    </label>
+                    <select
+                      id="container-select"
+                      className="container-select"
+                      value={activeApp?.container ?? ""}
+                      onChange={(event) => updateActiveAppContainer(event.target.value)}
+                    >
+                      {containerNames.map((container) => (
+                        <option key={container} value={container}>
+                          {container}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="new-container-row">
+                      <input
+                        className="new-container-input"
+                        placeholder="Create container"
+                        value={newContainerName}
+                        onChange={(event) => setNewContainerName(event.target.value)}
+                      />
+                      <button type="button" className="new-container-button" onClick={createContainerForActiveApp}>
+                        Add
+                      </button>
+                    </div>
+
+                    <div className="new-container-row">
+                      <input
+                        className="new-container-input"
+                        placeholder="Rename selected container"
+                        value={renameContainerName}
+                        onChange={(event) => setRenameContainerName(event.target.value)}
+                      />
+                      <button type="button" className="new-container-button" onClick={renameActiveContainer}>
+                        Rename
+                      </button>
+                    </div>
+
+                    <div className="danger-row">
+                      <button type="button" className="danger-action" onClick={() => void deleteActiveContainer()}>
+                        Delete Container
+                      </button>
+                    </div>
+
+                    <div className="members-line">
+                      Members: {activeContainerMembers.map((item) => item.name).join(", ") || "None"}
+                    </div>
+                  </div>
+                ) : null}
+              </section>
+            </div>
+          ) : null}
         </main>
       </div>
 
