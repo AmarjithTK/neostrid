@@ -13,6 +13,7 @@ let appState: PersistedAppState = DEFAULT_APP_STATE;
 const BROWSER_LIKE_USER_AGENT =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 const patchedSessionPartitions = new Set<string>();
+const APP_ICON_RELATIVE_PATH = join("build", "icons", "icon-512.png");
 
 function toBrowserLikeUserAgent(raw: string): string {
   // Remove Electron marker so strict UA checks treat it as standard Chromium.
@@ -62,6 +63,8 @@ async function writeStateToDisk(nextState: PersistedAppState): Promise<void> {
 }
 
 function createWindow(): BrowserWindow {
+  const appIconPath = isDev ? join(process.cwd(), APP_ICON_RELATIVE_PATH) : join(app.getAppPath(), APP_ICON_RELATIVE_PATH);
+
   const win = new BrowserWindow({
     width: 1480,
     height: 900,
@@ -69,6 +72,7 @@ function createWindow(): BrowserWindow {
     minHeight: 760,
     autoHideMenuBar: true,
     frame: false,
+    icon: appIconPath,
     backgroundColor: "#111827",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),

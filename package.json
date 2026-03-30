@@ -1,9 +1,10 @@
 {
-  "name": "biscuit-clone",
+  "name": "neostrid",
   "version": "0.1.0",
-  "description": "Container-first desktop app browser built with Electron and React.",
+  "description": "Neostrid container-first desktop app browser built with Electron and React.",
   "main": "dist-electron/main/index.js",
   "scripts": {
+    "clean:out": "node -e \"require('node:fs').rmSync('out',{recursive:true,force:true})\"",
     "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\" \"npm:dev:app\"",
     "dev:renderer": "vite",
     "dev:electron": "tsc -p tsconfig.electron.json --watch",
@@ -11,10 +12,14 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "build": "npm run typecheck && vite build && tsc -p tsconfig.electron.json",
     "start": "electron .",
-    "dist": "npm run build && electron-builder"
+    "dist": "npm run clean:out && npm run build && electron-builder",
+    "make": "npm run dist"
   },
   "keywords": [],
-  "author": "",
+  "author": {
+    "name": "Neostrid Team",
+    "email": "team@neostrid.app"
+  },
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
@@ -38,20 +43,25 @@
     "wait-on": "^9.0.4"
   },
   "build": {
-    "appId": "com.biscuitclone.app",
-    "productName": "Biscuit Clone",
+    "appId": "com.neostrid.app",
+    "productName": "Neostrid",
     "directories": {
       "output": "out"
     },
     "files": [
       "dist/**",
       "dist-electron/**",
+      "build/icons/**",
       "node_modules/**",
       "package.json"
     ],
+    "icon": "build/icons/icon-512.png",
     "linux": {
+      "icon": "build/icons/icon-512.png",
+      "maintainer": "Neostrid Team <team@neostrid.app>",
       "target": [
-        "AppImage"
+        "AppImage",
+        "deb"
       ],
       "category": "Utility"
     },
@@ -61,9 +71,15 @@
       ]
     },
     "win": {
+      "icon": "build/icons/favicon.ico",
       "target": [
         "nsis"
       ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "license": "LICENSE.txt"
     }
   }
 }

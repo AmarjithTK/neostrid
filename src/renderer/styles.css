@@ -56,7 +56,7 @@ body {
 
 .chrome-bar {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
@@ -65,10 +65,37 @@ body {
   -webkit-app-region: drag;
 }
 
+.chrome-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.launcher-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.launcher-mark img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
 .address-pill {
   border: 1px solid #e5e7eb;
   border-radius: 999px;
   padding: 8px 14px;
+  min-width: 0;
   font-size: 0.85rem;
   color: #4b5563;
   background: #f9fafb;
@@ -135,7 +162,7 @@ body {
 }
 
 .layout.compact {
-  grid-template-columns: 96px 1fr;
+  grid-template-columns: 76px 1fr;
 }
 
 .sidebar {
@@ -175,6 +202,12 @@ body {
   flex-direction: column;
   gap: 6px;
   margin-bottom: 10px;
+}
+
+.workspace-separator {
+  height: 1px;
+  margin: 2px 6px 4px;
+  background: linear-gradient(to right, transparent, #d1d5db, transparent);
 }
 
 .workspace-pill {
@@ -270,8 +303,19 @@ body {
 
 .icon-picker {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 6px;
+  max-height: 230px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.icon-search-input {
+  grid-column: 1 / -1;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #ffffff;
 }
 
 .icon-choice {
@@ -305,6 +349,12 @@ body {
   padding: 7px 9px;
   font-size: 0.8rem;
   cursor: pointer;
+}
+
+.app-edit-grid {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
 }
 
 .app-item {
@@ -383,7 +433,9 @@ body {
 }
 
 .app-icon {
+  position: relative;
   font-size: 0.95rem;
+  z-index: 2;
 }
 
 .app-instance-badge {
@@ -626,8 +678,17 @@ h1 {
 }
 
 .settings-trigger {
-  width: 28px;
-  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.settings-trigger i {
+  font-size: 0.78rem;
 }
 
 .layout.compact .app-subtitle {
@@ -643,25 +704,73 @@ h1 {
 }
 
 .layout.compact .sidebar-head {
-  justify-content: flex-end;
+  justify-content: center;
+  margin: 0 0 10px;
 }
 
 .layout.compact .workspace-pill {
+  width: 42px;
+  min-width: 42px;
+  min-height: 34px;
   justify-content: center;
-  padding: 7px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+}
+
+.layout.compact .workspace-pill.add {
+  border-style: dashed;
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+}
+
+.layout.compact .workspace-pill.active {
+  border-color: #d1d5db;
+  background: #ffffff;
 }
 
 .layout.compact .workspace-pill span {
   display: none;
 }
 
+.layout.compact .workspace-pill:not(.add) {
+  display: none;
+}
+
+.layout.compact .workspace-tabs {
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.layout.compact .workspace-separator {
+  width: 22px;
+  margin: 1px 0 3px;
+  background: #d1d5db;
+}
+
+.layout.compact .compact-toggle {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+}
+
 .layout.compact .app-item-row {
   grid-template-columns: 1fr;
+  justify-items: center;
 }
 
 .layout.compact .app-item {
   justify-content: center;
-  padding: 9px 7px;
+  width: 44px;
+  min-width: 44px;
+  padding: 10px 6px;
+  border-radius: 10px;
+}
+
+.layout.compact .app-list {
+  justify-items: center;
 }
 
 .layout.compact .app-labels {
