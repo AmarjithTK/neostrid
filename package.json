@@ -20,6 +20,7 @@
     "name": "Neostrid Team",
     "email": "team@neostrid.app"
   },
+  "homepage": "https://github.com/neostrid/neostrid",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
