@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import "@fontsource-variable/inter";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "./styles.css";
 

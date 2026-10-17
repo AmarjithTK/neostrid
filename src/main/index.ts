@@ -73,7 +73,7 @@ function createWindow(): BrowserWindow {
     autoHideMenuBar: true,
     frame: false,
     icon: appIconPath,
-    backgroundColor: "#111827",
+    backgroundColor: "#f4f4f6",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,              // Isolate preload from renderer context

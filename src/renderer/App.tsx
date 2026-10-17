@@ -341,6 +341,7 @@ export default function App() {
   const [activeAppId, setActiveAppId] = useState<string>(DEFAULT_APP_STATE.viewState.activeAppId ?? "");
   const [switcherOpen, setSwitcherOpen] = useState<boolean>(false);
   const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
+  const [editOpen, setEditOpen] = useState<boolean>(false);
   const [query, setQuery] = useState<string>("");
   const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
   const [newContainerName, setNewContainerName] = useState<string>("");
@@ -634,16 +635,27 @@ export default function App() {
 
       if (isSwitcherToggle) {
         event.preventDefault();
+        setShowAddApp(false);
+        setEditOpen(false);
+        setSettingsOpen(false);
         setSwitcherOpen((prev) => !prev);
         return;
       }
 
-      if (!switcherOpen) {
+      if (event.key === "Escape") {
+        if (switcherOpen) {
+          setSwitcherOpen(false);
+        } else if (editOpen) {
+          setEditOpen(false);
+        } else if (settingsOpen) {
+          setSettingsOpen(false);
+        } else if (showAddApp) {
+          setShowAddApp(false);
+        }
         return;
       }
 
-      if (event.key === "Escape") {
-        setSwitcherOpen(false);
+      if (!switcherOpen) {
         return;
       }
 
@@ -683,7 +695,7 @@ export default function App() {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [filteredApps, highlightedIndex, switcherOpen]);
+  }, [editOpen, filteredApps, highlightedIndex, settingsOpen, showAddApp, switcherOpen]);
 
   const updateActiveAppContainer = (containerName: string) => {
     if (!activeAppId) {
@@ -927,6 +939,7 @@ export default function App() {
       );
 
       setActiveWorkspace(targetWorkspaceId);
+      setEditOpen(false);
     } catch {
       return;
     }
@@ -1114,83 +1127,116 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <header className="chrome-bar">
+      <header
+        className="chrome-bar"
+        onDoubleClick={(event) => {
+          if ((event.target as HTMLElement).closest("button, input, select")) {
+            return;
+          }
+          void window.appApi.toggleMaximizeWindow();
+        }}
+      >
         <div className="chrome-left">
           <div className="launcher-mark" title="Neostrid">
             <img src={neostridLauncherIcon} alt="Neostrid" />
           </div>
-          <div className="address-pill">{activeApp?.url ?? "https://"}</div>
+          <div className="address-pill" title={activeApp?.url ?? "https://"}>
+            {isPageLoading ? (
+              <i className="fa-solid fa-circle-notch fa-spin address-spinner" aria-hidden="true" />
+            ) : (
+              <i className="fa-solid fa-lock address-lock" aria-hidden="true" />
+            )}
+            <span className="address-text">{activeApp?.url ?? "https://"}</span>
+          </div>
         </div>
         <div className="header-actions">
-          <button
-            type="button"
-            className="toolbar-button"
-            disabled={!canGoBack}
-            onClick={() => getActiveWebview()?.goBack()}
-          >
-            Back
-          </button>
-          <button
-            type="button"
-            className="toolbar-button"
-            disabled={!canGoForward}
-            onClick={() => getActiveWebview()?.goForward()}
-          >
-            Forward
-          </button>
-          <button type="button" className="toolbar-button" onClick={() => getActiveWebview()?.reload()}>
-            Reload
-          </button>
-          <button type="button" className="toolbar-button" onClick={() => void toggleFullscreen()}>
-            Fullscreen
-          </button>
-          <div className="container-indicator" title={`Current container: ${activeContainerLabel}`}>
-            <span className="container-indicator-label">Container</span>
-            <span
-              className={`container-indicator-value ${
-                activeContainerLabel === "Standalone" ? "standalone" : "shared"
-              }`}
+          <div className="nav-cluster">
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Go back"
+              title="Back"
+              disabled={!canGoBack}
+              onClick={() => getActiveWebview()?.goBack()}
             >
-              {activeContainerLabel}
-            </span>
+              <i className="fa-solid fa-arrow-left" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Go forward"
+              title="Forward"
+              disabled={!canGoForward}
+              onClick={() => getActiveWebview()?.goForward()}
+            >
+              <i className="fa-solid fa-arrow-right" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Reload page"
+              title="Reload"
+              onClick={() => getActiveWebview()?.reload()}
+            >
+              <i className="fa-solid fa-rotate-right" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Toggle fullscreen"
+              title="Fullscreen"
+              onClick={() => void toggleFullscreen()}
+            >
+              <i className="fa-solid fa-expand" aria-hidden="true" />
+            </button>
           </div>
-          <span className="toolbar-state">
-            {isPageLoading ? "Loading..." : lastLoadError ? `Error: ${lastLoadError}` : "Ready"}
+          <div className="container-indicator" title={`Current container: ${activeContainerLabel}`}>
+            <span
+              className={`container-dot ${activeContainerLabel === "Standalone" ? "standalone" : "shared"}`}
+              aria-hidden="true"
+            />
+            <span className="container-indicator-label">Session</span>
+            <span className="container-indicator-value">{activeContainerLabel}</span>
+          </div>
+          <span className={`toolbar-state ${!isPageLoading && lastLoadError ? "error" : ""}`}>
+            {isPageLoading ? "Loading…" : lastLoadError ? lastLoadError : ""}
           </span>
           <button
             type="button"
-            className="ghost-button settings-trigger"
-            aria-label="Open settings"
-            title="Settings"
+            className={`icon-button ${settingsOpen ? "active" : ""}`}
+            aria-label={settingsOpen ? "Close settings" : "Open settings"}
+            title={settingsOpen ? "Close settings" : "Settings"}
             onClick={() => setSettingsOpen((prev) => !prev)}
           >
             <i className="fa-solid fa-gear" aria-hidden="true" />
-            <span>Settings</span>
           </button>
           <div className="window-controls-right">
             <button
               type="button"
               className="window-control-button"
               aria-label="Minimize window"
+              title="Minimize"
               onClick={() => void window.appApi.minimizeWindow()}
             >
-              _
+              <i className="fa-solid fa-minus" aria-hidden="true" />
             </button>
             <button
               type="button"
               className="window-control-button"
               aria-label="Maximize or restore window"
+              title="Maximize"
               onClick={() => void window.appApi.toggleMaximizeWindow()}
             >
-              □
+              <i className="fa-regular fa-square" aria-hidden="true" />
             </button>
             <button
               type="button"
               className="window-control-button close"
               aria-label="Close window"
+              title="Close"
               onClick={() => void window.appApi.closeWindow()}
             >
-              ×
+              <i className="fa-solid fa-xmark" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -1199,7 +1245,10 @@ export default function App() {
       <div className={`layout ${compactSidebar ? "compact" : ""}`}>
         <aside className="sidebar">
           <div className="sidebar-head">
-            <div className="brand">Neostrid</div>
+            <div className="brand">
+              <img src={neostridLauncherIcon} alt="" className="brand-logo" />
+              <span>Neostrid</span>
+            </div>
             <button
               type="button"
               className="compact-toggle"
@@ -1214,22 +1263,17 @@ export default function App() {
             <button
               type="button"
               className="workspace-pill add"
-              title={showAddApp ? "Close Add App" : "Add App"}
+              title="Add App"
+              aria-label="Add App"
               onClick={() => {
-                setShowAddApp((prev) => {
-                  const next = !prev;
-                  if (next) {
-                    setCompactSidebar(false);
-                    setNewAppWorkspaceId(activeWorkspace);
-                    setNewAppIconSearch("");
-                    setNewAppIconClass(ICON_CHOICES[0]);
-                  }
-                  return next;
-                });
+                setShowAddApp(true);
+                setNewAppWorkspaceId(activeWorkspace);
+                setNewAppIconSearch("");
+                setNewAppIconClass(ICON_CHOICES[0]);
               }}
             >
-              <i className={`fa-solid ${showAddApp ? "fa-xmark" : "fa-plus"}`} aria-hidden="true" />
-              <span>{showAddApp ? "Close" : "Add App"}</span>
+              <i className="fa-solid fa-plus" aria-hidden="true" />
+              <span>Add App</span>
             </button>
             <div className="workspace-separator" aria-hidden="true" />
             {workspaces.map((workspace) => (
@@ -1244,77 +1288,6 @@ export default function App() {
                 <span>{workspace.label}</span>
               </button>
             ))}
-
-            {showAddApp ? (
-              <div className="add-app-panel">
-                <div className="preset-grid" aria-label="App presets">
-                  {APP_PRESETS.map((preset) => (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      className="preset-chip"
-                      onClick={() => applyPresetToForm(preset)}
-                    >
-                      <i className={preset.iconClass} aria-hidden="true" />
-                      <span>{preset.name}</span>
-                    </button>
-                  ))}
-                </div>
-                <input
-                  className="add-app-input"
-                  placeholder="App name"
-                  value={newAppName}
-                  onChange={(event) => setNewAppName(event.target.value)}
-                />
-                <input
-                  className="add-app-input"
-                  placeholder="https://example.com"
-                  value={newAppUrl}
-                  onChange={(event) => setNewAppUrl(event.target.value)}
-                />
-                <select
-                  className="add-app-input"
-                  value={newAppWorkspaceId}
-                  onChange={(event) => setNewAppWorkspaceId(event.target.value)}
-                >
-                  {workspaces.map((workspace) => (
-                    <option key={workspace.id} value={workspace.id}>
-                      {workspace.label}
-                    </option>
-                  ))}
-                </select>
-                <div className="icon-picker" aria-label="Icon picker">
-                  <input
-                    className="add-app-input icon-search-input"
-                    placeholder="Search icons"
-                    value={newAppIconSearch}
-                    onChange={(event) => setNewAppIconSearch(event.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className={`icon-choice ${newAppIconClass === inferIconClass(newAppName, newAppUrl) ? "active" : ""}`}
-                    title="Auto icon"
-                    onClick={() => setNewAppIconClass(inferIconClass(newAppName, newAppUrl))}
-                  >
-                    <i className="fa-solid fa-wand-magic-sparkles" aria-hidden="true" />
-                  </button>
-                  {filteredNewIconChoices.map((choice) => (
-                    <button
-                      key={choice.iconClass}
-                      type="button"
-                      className={`icon-choice ${newAppIconClass === choice.iconClass ? "active" : ""}`}
-                      title={choice.label}
-                      onClick={() => setNewAppIconClass(choice.iconClass)}
-                    >
-                      <i className={choice.iconClass} aria-hidden="true" />
-                    </button>
-                  ))}
-                </div>
-                <button type="button" className="add-app-submit" onClick={createApp}>
-                  Save App
-                </button>
-              </div>
-            ) : null}
           </div>
 
           <div className="section-label">Apps</div>
@@ -1342,9 +1315,10 @@ export default function App() {
                   type="button"
                   className="app-item-remove"
                   aria-label={`Delete ${item.name}`}
+                  title={`Delete ${item.name}`}
                   onClick={() => deleteAppById(item.id)}
                 >
-                  ×
+                  <i className="fa-solid fa-trash-can" aria-hidden="true" />
                 </button>
               </div>
             ))}
@@ -1376,7 +1350,17 @@ export default function App() {
                 })}
               </div>
             ) : (
-              <div className="webview-empty">Create or select an app to start browsing.</div>
+              <div className="webview-empty">
+                <div className="empty-state-card">
+                  <div className="empty-state-icon">
+                    <i className="fa-solid fa-window-restore" aria-hidden="true" />
+                  </div>
+                  <div className="empty-state-title">No app open</div>
+                  <div className="empty-state-hint">
+                    Add an app from the sidebar, or press <kbd>Ctrl</kbd>+<kbd>K</kbd> to jump between your apps.
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
@@ -1388,54 +1372,195 @@ export default function App() {
             onChange={importState}
           />
 
-          {settingsOpen ? (
-            <div className="settings-overlay" role="presentation" onClick={() => setSettingsOpen(false)}>
-              <section className="settings-popup" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-                <div className="settings-heading">Neostrid Settings</div>
-
-                <div className="settings-actions">
-                  <button type="button" className="ghost-button" onClick={() => importInputRef.current?.click()}>
-                    Import
-                  </button>
-                  <button type="button" className="ghost-button" onClick={exportState}>
-                    Export
-                  </button>
-                  <button type="button" className="ghost-button" onClick={() => setSwitcherOpen(true)}>
-                    Open Switcher
+          {showAddApp ? (
+            <div className="modal-overlay" role="presentation" onClick={() => setShowAddApp(false)}>
+              <section
+                className="modal-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Add app"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="modal-head">
+                  <div className="modal-title">
+                    <i className="fa-solid fa-plus" aria-hidden="true" />
+                    Add App
+                  </div>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label="Close add app dialog"
+                    title="Close"
+                    onClick={() => setShowAddApp(false)}
+                  >
+                    <i className="fa-solid fa-xmark" aria-hidden="true" />
                   </button>
                 </div>
-
-                <div className="settings-actions">
-                  <button type="button" className="danger-chip" onClick={clearActiveAppData}>
-                    Clear Data
-                  </button>
-                  <button type="button" className="danger-chip" onClick={deleteActiveApp}>
-                    Delete App
-                  </button>
-                </div>
-
-                <div className="session-header">Edit Active App</div>
-                {activeApp ? (
-                  <div className="app-edit-grid">
+                <div className="modal-body add-body">
+                  <div className="modal-field-block presets-block">
+                    <div className="field-label">Presets</div>
+                    <div className="preset-grid" role="group" aria-label="App presets">
+                      {APP_PRESETS.map((preset) => (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          className="preset-chip"
+                          onClick={() => applyPresetToForm(preset)}
+                        >
+                          <i className={preset.iconClass} aria-hidden="true" />
+                          <span>{preset.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="modal-field-block">
+                    <label className="field-label" htmlFor="add-app-name">
+                      App name
+                    </label>
                     <input
+                      autoFocus
+                      id="add-app-name"
+                      className="add-app-input"
+                      placeholder="e.g. Gmail"
+                      value={newAppName}
+                      onChange={(event) => setNewAppName(event.target.value)}
+                    />
+                    <label className="field-label" htmlFor="add-app-url">
+                      URL
+                    </label>
+                    <input
+                      id="add-app-url"
+                      className="add-app-input"
+                      placeholder="https://example.com"
+                      value={newAppUrl}
+                      onChange={(event) => setNewAppUrl(event.target.value)}
+                    />
+                    <label className="field-label" htmlFor="add-app-workspace">
+                      Workspace
+                    </label>
+                    <select
+                      id="add-app-workspace"
+                      className="add-app-input"
+                      value={newAppWorkspaceId}
+                      onChange={(event) => setNewAppWorkspaceId(event.target.value)}
+                    >
+                      {workspaces.map((workspace) => (
+                        <option key={workspace.id} value={workspace.id}>
+                          {workspace.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="modal-field-block">
+                    <label className="field-label" htmlFor="add-app-icon-search">
+                      Icon
+                    </label>
+                    <div className="icon-picker" role="group" aria-label="Icon picker">
+                      <input
+                        id="add-app-icon-search"
+                        className="add-app-input icon-search-input"
+                        placeholder="Search icons"
+                        value={newAppIconSearch}
+                        onChange={(event) => setNewAppIconSearch(event.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className={`icon-choice ${newAppIconClass === inferIconClass(newAppName, newAppUrl) ? "active" : ""}`}
+                        title="Auto icon"
+                        onClick={() => setNewAppIconClass(inferIconClass(newAppName, newAppUrl))}
+                      >
+                        <i className="fa-solid fa-wand-magic-sparkles" aria-hidden="true" />
+                      </button>
+                      {filteredNewIconChoices.map((choice) => (
+                        <button
+                          key={choice.iconClass}
+                          type="button"
+                          className={`icon-choice ${newAppIconClass === choice.iconClass ? "active" : ""}`}
+                          title={choice.label}
+                          onClick={() => setNewAppIconClass(choice.iconClass)}
+                        >
+                          <i className={choice.iconClass} aria-hidden="true" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-foot">
+                  <button type="button" className="ghost-button" onClick={() => setShowAddApp(false)}>
+                    Cancel
+                  </button>
+                  <button type="button" className="primary-button" onClick={createApp}>
+                    <i className="fa-solid fa-plus" aria-hidden="true" />
+                    Add App
+                  </button>
+                </div>
+              </section>
+            </div>
+          ) : null}
+
+          {editOpen ? (
+            <div className="modal-overlay" role="presentation" onClick={() => setEditOpen(false)}>
+              <section
+                className="modal-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Edit app"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="modal-head">
+                  <div className="modal-title">
+                    <i className="fa-solid fa-pen" aria-hidden="true" />
+                    Edit App
+                    {activeApp ? <span className="modal-title-context">{activeApp.name}</span> : null}
+                  </div>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label="Close edit app dialog"
+                    title="Close"
+                    onClick={() => setEditOpen(false)}
+                  >
+                    <i className="fa-solid fa-xmark" aria-hidden="true" />
+                  </button>
+                </div>
+                <div className="modal-body edit-body">
+                  <div className="modal-field-block">
+                    <label className="field-label" htmlFor="edit-app-name">
+                      Name
+                    </label>
+                    <input
+                      autoFocus
+                      id="edit-app-name"
                       className="add-app-input"
                       placeholder="App name"
                       value={editAppName}
                       onChange={(event) => setEditAppName(event.target.value)}
                     />
+                    <label className="field-label" htmlFor="edit-app-subtitle">
+                      Subtitle
+                    </label>
                     <input
+                      id="edit-app-subtitle"
                       className="add-app-input"
                       placeholder="Subtitle"
                       value={editAppSubtitle}
                       onChange={(event) => setEditAppSubtitle(event.target.value)}
                     />
+                    <label className="field-label" htmlFor="edit-app-url">
+                      URL
+                    </label>
                     <input
+                      id="edit-app-url"
                       className="add-app-input"
                       placeholder="https://example.com"
                       value={editAppUrl}
                       onChange={(event) => setEditAppUrl(event.target.value)}
                     />
+                    <label className="field-label" htmlFor="edit-app-workspace">
+                      Workspace
+                    </label>
                     <select
+                      id="edit-app-workspace"
                       className="add-app-input"
                       value={editAppWorkspaceId}
                       onChange={(event) => setEditAppWorkspaceId(event.target.value)}
@@ -1446,8 +1571,14 @@ export default function App() {
                         </option>
                       ))}
                     </select>
-                    <div className="icon-picker" aria-label="Edit app icon picker">
+                  </div>
+                  <div className="modal-field-block">
+                    <label className="field-label" htmlFor="edit-app-icon-search">
+                      Icon
+                    </label>
+                    <div className="icon-picker" role="group" aria-label="Edit app icon picker">
                       <input
+                        id="edit-app-icon-search"
                         className="add-app-input icon-search-input"
                         placeholder="Search icons"
                         value={editAppIconSearch}
@@ -1473,89 +1604,153 @@ export default function App() {
                         </button>
                       ))}
                     </div>
-                    <button type="button" className="add-app-submit" onClick={applyAppEdits}>
-                      Save Changes
-                    </button>
                   </div>
-                ) : (
-                  <div className="empty-state">Select an app to edit.</div>
-                )}
-
-                <div className="session-header">Session Mode</div>
-                <div className="mode-toggle">
-                  <button
-                    type="button"
-                    className={`mode-button ${activeApp?.container === "Standalone" ? "active" : ""}`}
-                    onClick={() => requestContainerSwitch("Standalone")}
-                  >
-                    Standalone
+                </div>
+                <div className="modal-foot">
+                  <button type="button" className="ghost-button" onClick={() => setEditOpen(false)}>
+                    Cancel
                   </button>
-                  <button
-                    type="button"
-                    className={`mode-button ${activeApp?.container !== "Standalone" ? "active" : ""}`}
-                    onClick={() => {
-                      if (containerNames.length > 0) {
-                        requestContainerSwitch(containerNames[0]);
-                      }
-                    }}
-                  >
-                    Use Container
+                  <button type="button" className="primary-button" onClick={applyAppEdits}>
+                    <i className="fa-solid fa-check" aria-hidden="true" />
+                    Save Changes
                   </button>
                 </div>
+              </section>
+            </div>
+          ) : null}
 
-                {activeApp?.container !== "Standalone" ? (
-                  <div className="container-controls">
-                    <label className="inline-label" htmlFor="container-select">
-                      Container
-                    </label>
-                    <select
-                      id="container-select"
-                      className="container-select"
-                      value={activeApp?.container ?? ""}
-                      onChange={(event) => requestContainerSwitch(event.target.value)}
-                    >
-                      {containerNames.map((container) => (
-                        <option key={container} value={container}>
-                          {container}
-                        </option>
-                      ))}
-                    </select>
+          {settingsOpen ? (
+            <div className="settings-overlay" role="presentation" onClick={() => setSettingsOpen(false)}>
+              <section className="settings-popup" role="dialog" aria-modal="true" aria-label="Neostrid settings" onClick={(event) => event.stopPropagation()}>
+                <div className="settings-heading">
+                  <i className="fa-solid fa-gear" aria-hidden="true" />
+                  Neostrid Settings
+                </div>
 
-                    <div className="new-container-row">
-                      <input
-                        className="new-container-input"
-                        placeholder="Create container"
-                        value={newContainerName}
-                        onChange={(event) => setNewContainerName(event.target.value)}
-                      />
-                      <button type="button" className="new-container-button" onClick={createContainerForActiveApp}>
-                        Add
-                      </button>
-                    </div>
-
-                    <div className="new-container-row">
-                      <input
-                        className="new-container-input"
-                        placeholder="Rename selected container"
-                        value={renameContainerName}
-                        onChange={(event) => setRenameContainerName(event.target.value)}
-                      />
-                      <button type="button" className="new-container-button" onClick={renameActiveContainer}>
-                        Rename
-                      </button>
-                    </div>
-
-                    <div className="danger-row">
-                      <button type="button" className="danger-action" onClick={() => void deleteActiveContainer()}>
-                        Delete Container
-                      </button>
-                    </div>
-
-                    <div className="members-line">
-                      Members: {activeContainerMembers.map((item) => item.name).join(", ") || "None"}
-                    </div>
+                <div className="settings-section">
+                  <div className="settings-section-title">Data</div>
+                  <div className="settings-actions">
+                    <button type="button" className="ghost-button" onClick={() => importInputRef.current?.click()}>
+                      <i className="fa-solid fa-file-import" aria-hidden="true" />
+                      Import
+                    </button>
+                    <button type="button" className="ghost-button" onClick={exportState}>
+                      <i className="fa-solid fa-file-export" aria-hidden="true" />
+                      Export
+                    </button>
+                    <button type="button" className="ghost-button" onClick={() => setSwitcherOpen(true)}>
+                      <i className="fa-solid fa-magnifying-glass" aria-hidden="true" />
+                      Switcher
+                    </button>
                   </div>
-                ) : null}
+                  <div className="settings-actions">
+                    <button type="button" className="danger-chip" onClick={clearActiveAppData}>
+                      <i className="fa-solid fa-broom" aria-hidden="true" />
+                      Clear Data
+                    </button>
+                    <button type="button" className="danger-chip" onClick={deleteActiveApp}>
+                      <i className="fa-solid fa-trash-can" aria-hidden="true" />
+                      Delete App
+                    </button>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title">Edit App</div>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    disabled={!activeApp}
+                    onClick={() => {
+                      setEditOpen(true);
+                      setSettingsOpen(false);
+                    }}
+                  >
+                    <i className="fa-solid fa-pen" aria-hidden="true" />
+                    Edit App Details
+                  </button>
+                  {!activeApp ? <div className="empty-state">Select an app to edit.</div> : null}
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-title">Session Mode</div>
+                  <div className="mode-toggle">
+                    <button
+                      type="button"
+                      className={`mode-button ${activeApp?.container === "Standalone" ? "active" : ""}`}
+                      onClick={() => requestContainerSwitch("Standalone")}
+                    >
+                      Standalone
+                    </button>
+                    <button
+                      type="button"
+                      className={`mode-button ${activeApp?.container !== "Standalone" ? "active" : ""}`}
+                      onClick={() => {
+                        if (containerNames.length > 0) {
+                          requestContainerSwitch(containerNames[0]);
+                        }
+                      }}
+                    >
+                      Use Container
+                    </button>
+                  </div>
+
+                  {activeApp?.container !== "Standalone" ? (
+                    <div className="container-controls">
+                      <label className="inline-label" htmlFor="container-select">
+                        Container
+                      </label>
+                      <select
+                        id="container-select"
+                        className="container-select"
+                        value={activeApp?.container ?? ""}
+                        onChange={(event) => requestContainerSwitch(event.target.value)}
+                      >
+                        {containerNames.map((container) => (
+                          <option key={container} value={container}>
+                            {container}
+                          </option>
+                        ))}
+                      </select>
+
+                      <div className="new-container-row">
+                        <input
+                          className="new-container-input"
+                          aria-label="Create container"
+                          placeholder="Create container"
+                          value={newContainerName}
+                          onChange={(event) => setNewContainerName(event.target.value)}
+                        />
+                        <button type="button" className="new-container-button" onClick={createContainerForActiveApp}>
+                          Add
+                        </button>
+                      </div>
+
+                      <div className="new-container-row">
+                        <input
+                          className="new-container-input"
+                          aria-label="Rename selected container"
+                          placeholder="Rename selected container"
+                          value={renameContainerName}
+                          onChange={(event) => setRenameContainerName(event.target.value)}
+                        />
+                        <button type="button" className="new-container-button" onClick={renameActiveContainer}>
+                          Rename
+                        </button>
+                      </div>
+
+                      <div className="danger-row">
+                        <button type="button" className="danger-action" onClick={() => void deleteActiveContainer()}>
+                          Delete Container
+                        </button>
+                      </div>
+
+                      <div className="members-line">
+                        Members: {activeContainerMembers.map((item) => item.name).join(", ") || "None"}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               </section>
             </div>
           ) : null}
@@ -1564,14 +1759,19 @@ export default function App() {
 
       {switcherOpen ? (
         <div className="switcher-overlay" role="presentation" onClick={() => setSwitcherOpen(false)}>
-          <section className="switcher" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <input
-              autoFocus
-              className="switcher-input"
-              placeholder="Search apps, containers, or accounts"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
+          <section className="switcher" role="dialog" aria-modal="true" aria-label="App switcher" onClick={(event) => event.stopPropagation()}>
+            <div className="switcher-input-wrap">
+              <i className="fa-solid fa-magnifying-glass switcher-search-icon" aria-hidden="true" />
+              <input
+                autoFocus
+                className="switcher-input"
+                aria-label="Search apps"
+                placeholder="Search apps…"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+              <kbd className="switcher-kbd">ESC</kbd>
+            </div>
             <div className="switcher-list">
               {filteredApps.map((item, index) => (
                 <button
@@ -1584,16 +1784,33 @@ export default function App() {
                     setSwitcherOpen(false);
                   }}
                 >
-                  <div>
-                    <div className="switcher-title">{item.name}</div>
-                    <div className="switcher-subtitle">{item.subtitle}</div>
-                  </div>
+                  <span className="switcher-icon-tile">
+                    <i className={`app-icon ${getIconClassForApp(item)}`} aria-hidden="true" />
+                  </span>
+                  <span className="switcher-main">
+                    <span className="switcher-title">{item.name}</span>
+                    <span className="switcher-subtitle">{item.subtitle}</span>
+                  </span>
                   <span className="switcher-container">{item.container}</span>
                 </button>
               ))}
               {filteredApps.length === 0 ? <div className="empty-state">No apps found</div> : null}
             </div>
-            <footer className="switcher-hint">arrow keys to navigate · enter to select · esc to dismiss</footer>
+            <footer className="switcher-hint">
+              <span>
+                <kbd>↑</kbd>
+                <kbd>↓</kbd>
+                navigate
+              </span>
+              <span>
+                <kbd>↵</kbd>
+                select
+              </span>
+              <span>
+                <kbd>esc</kbd>
+                dismiss
+              </span>
+            </footer>
           </section>
         </div>
       ) : null}
